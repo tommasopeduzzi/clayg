@@ -17,7 +17,6 @@ std::vector<std::shared_ptr<DecodingGraphEdge>> UnionFindDecoder::decode(Decodin
     while (!Cluster::all_clusters_are_neutral(clusters)) {
         std::set<std::shared_ptr<DecodingGraphEdge>> fusion_edges;
         for (auto cluster: clusters) {
-            if (cluster->is_neutral()) continue;
             auto new_fusion_edges = grow(cluster);
             fusion_edges.insert(new_fusion_edges.begin(), new_fusion_edges.end());
         }
@@ -59,6 +58,8 @@ void UnionFindDecoder::merge(std::set<std::shared_ptr<DecodingGraphEdge>> fusion
         auto node1 = nodes.first;
         auto node2 = nodes.second;
 
+        if (node1->cluster()->is_neutral() && node2->cluster()->is_neutral()) continue;
+
         if (node1->cluster()->is_neutral()) {
             auto swap = node1;
             node1 = node2;
@@ -78,6 +79,9 @@ void UnionFindDecoder::merge(std::set<std::shared_ptr<DecodingGraphEdge>> fusion
 
         for (auto node: cluster2->nodes()) {
             cluster1->addNode(node);
+            if (node->id().type == DecodingGraphNode::VIRTUAL) {
+                cluster1->addVirtualNode(node);
+            }
             if (node->marked()) {
                 cluster1->addMarkedNode(node);
             }

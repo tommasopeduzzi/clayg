@@ -58,12 +58,15 @@ std::vector<std::shared_ptr<DecodingGraphEdge>> PeelingDecoder::peel(std::shared
     // NOTE: vector<pair<tree_nde, edge>>
     std::vector<std::pair<std::shared_ptr<DecodingGraphNode>, std::shared_ptr<DecodingGraphEdge>>> spanning_forest_edges = {};
 
-    auto start_node = cluster->root();
-    for (auto node: cluster->marked_nodes()) {
+    std::shared_ptr<DecodingGraphNode> start_node = nullptr;
+    for (auto node: cluster->nodes()) {
         if (node->id().type == DecodingGraphNode::Type::VIRTUAL) {
             start_node = node;
             break;
         }
+    }
+    if (start_node == nullptr) {
+        start_node = cluster->root();
     }
     spanning_forest_nodes.push_back(start_node);
 

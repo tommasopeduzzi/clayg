@@ -16,6 +16,7 @@ class Cluster {
     std::shared_ptr<DecodingGraphNode> m_root;
     std::vector<std::shared_ptr<DecodingGraphNode>> m_nodes;
     std::vector<std::shared_ptr<DecodingGraphNode>> m_marked_nodes;
+    std::vector<std::shared_ptr<DecodingGraphNode>> m_virtual_nodes;
     std::vector<std::shared_ptr<DecodingGraphEdge>> m_edges;
     std::vector<std::shared_ptr<DecodingGraphEdge>> m_boundary;
 
@@ -28,6 +29,10 @@ public:
 
     void addMarkedNode(std::shared_ptr<DecodingGraphNode> node) {
         m_marked_nodes.push_back(node);
+    }
+
+    void addVirtualNode(std::shared_ptr<DecodingGraphNode> node) {
+        m_virtual_nodes.push_back(node);
     }
 
     void removeMarkedNode(std::shared_ptr<DecodingGraphNode> node) {

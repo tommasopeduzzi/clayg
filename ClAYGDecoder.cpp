@@ -37,6 +37,7 @@ std::vector<std::shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(DecodingGra
 
     std::vector<std::shared_ptr<Cluster>> clusters;
 
+    // FIXME: Do we actually need to keep track of all clusters?
     for (auto node : graph.nodes()) {
         clusters.push_back(node->cluster());
     }
@@ -44,13 +45,10 @@ std::vector<std::shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(DecodingGra
     std::vector<std::shared_ptr<DecodingGraphEdge>> error_edges;
 
     int g = 1;
-    for (int round = -1; round <= rounds; round++) {
+    for (int round = 0; round <= rounds; round++) {
         std::vector<std::shared_ptr<DecodingGraphNode>> nodes;
         for (auto node: marked_nodes) {
             if (node->id().round == round && node->marked() && node->id().type == DecodingGraphNode::Type::ANCILLA) {
-                nodes.push_back(node);
-            }
-            if (round == -1 && node->id().type == DecodingGraphNode::Type::VIRTUAL) {
                 nodes.push_back(node);
             }
         }

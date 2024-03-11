@@ -68,17 +68,15 @@ int main(int argc, char *argv[]) {
                           << std::endl;
             }
 #endif
-            // error edges with edges
-/*
-            error_edges = {
-                    graph.edge({DecodingGraphEdge::NORMAL, 1, 23}).value(),
-                    graph.edge({DecodingGraphEdge::NORMAL, 4, 4}).value(),
-                    graph.edge({DecodingGraphEdge::NORMAL, 4,19}).value(),
-            };
-*/
+
+            auto initial_error_edges = error_edges;
+
             for (auto edge: error_edges) {
                 auto nodes = {edge->nodes().first, edge->nodes().second};
                 for (auto node: nodes) {
+                    if (node->id().type == DecodingGraphNode::VIRTUAL) {
+                        continue;
+                    }
                     if (node->marked()) {
                         node->set_marked(false);
                         node->cluster()->removeMarkedNode(node);
@@ -102,23 +100,43 @@ int main(int argc, char *argv[]) {
             }
 #endif
             // FIXME: Update checking to work?!
+            auto logical_edge_ids = graph.logical_edges();
             int logical = 0;
             for (auto error: error_edges) {
                 // Check if edge is relevant to final measurement
                 if (error->id().type == DecodingGraphEdge::Type::MEASUREMENT)
                     continue;
-                if (error->id().id % D != 0)
+
+                if (error->id().id > 9)
                     continue;
 
-                logical++;
+                if (error->id().id < 5)
+                    continue;
+
+                logical += 1;
             }
 
             logical = logical % 2;
 
             logicals += logical;
 
+
 #ifdef DEBUG
-            std::cout << "Logical: " << logical << std::endl;
+            if (logical == 1) {
+                std::cout << "Error edges: " << initial_error_edges.size() << std::endl;
+                for (auto edge: initial_error_edges) {
+                    std::cout << edge->id().round << ": " << edge->id().id << ", Type : "
+                              << (edge->id().type == DecodingGraphEdge::Type::MEASUREMENT ? "Measurement" : "Normal")
+                              << std::endl;
+                }
+                std::cout << "Final error edges: " << final_error_edges.size() << std::endl;
+                for (auto edge: final_error_edges) {
+                    std::cout << edge->id().round << ": " << edge->id().id << ", Type : "
+                              << (edge->id().type == DecodingGraphEdge::Type::MEASUREMENT ? "Measurement" : "Normal")
+                              << std::endl;
+                }
+                std::cout << "Logical: " << logical << std::endl;
+            }
 #endif
 
         }
