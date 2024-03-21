@@ -4,6 +4,90 @@
 
 #include "DecodingGraph.h"
 
+DecodingGraph DecodingGraph::surface_code(int D, int T) {
+    int ancilla_height = D - 1;
+    int ancilla_width = D - 1;
+
+    DecodingGraph graph;
+
+    graph.m_ancilla_count_per_layer = ancilla_height * ancilla_width;
+    graph.D = D;
+    graph.T = T;
+
+    std::vector<std::shared_ptr<DecodingGraphNode>> top_boundary_nodes{};
+    std::vector<std::shared_ptr<DecodingGraphNode>> bottom_boundary_nodes{};
+
+    for (int i = 0; i < ancilla_width; i++) {
+        auto top_node = std::make_shared<DecodingGraphNode>(
+                DecodingGraphNode::Id{DecodingGraphNode::Type::VIRTUAL, 0, i});
+        auto bottom_node = std::make_shared<DecodingGraphNode>(
+                DecodingGraphNode::Id{DecodingGraphNode::Type::VIRTUAL, 0, i + D - 2});
+        graph.addNode(top_node);
+        graph.addNode(bottom_node);
+        top_boundary_nodes.push_back(top_node);
+        bottom_boundary_nodes.push_back(bottom_node);
+    }
+
+    for (int t = 0; t < T; t++) {
+        DecodingGraphEdge::Id current_edge_id = {DecodingGraphEdge::NORMAL, t, 0};
+        for (int y = 0; y < ancilla_height; y++) {
+            for (int x = 0; x < ancilla_width; x++) {
+                auto id = DecodingGraphNode::Id{DecodingGraphNode::Type::ANCILLA, t, x + y * ancilla_width};
+                std::shared_ptr<DecodingGraphNode> node = std::make_shared<DecodingGraphNode>(id);
+                graph.addNode(node);
+
+                if (t > 0) {
+                    auto other_node = DecodingGraphNode::Id{DecodingGraphNode::Type::ANCILLA, t - 1,
+                                                            x + y * ancilla_width};
+                    auto nodes = std::make_pair(node, graph.node(other_node).value());
+                    graph.addEdge(std::make_shared<DecodingGraphEdge>(
+                            DecodingGraphEdge::Id{DecodingGraphEdge::MEASUREMENT, t - 1, x + y * ancilla_width}, nodes));
+                }
+
+                if (y == 0) {
+                    auto nodes = std::make_pair(node, top_boundary_nodes[x]);
+                    graph.addEdge(std::make_shared<DecodingGraphEdge>(
+                            current_edge_id, nodes));
+                    current_edge_id++;
+                } else {
+                    auto other_node = DecodingGraphNode::Id{DecodingGraphNode::Type::ANCILLA, 0,
+                                                            x + (y - 1) * ancilla_width};
+                    auto nodes = std::make_pair(node, graph.node(other_node).value());
+                    graph.addEdge(std::make_shared<DecodingGraphEdge>(
+                            current_edge_id, nodes));
+                    current_edge_id++;
+                }
+
+                if (x > 0) {
+                    auto other_node = DecodingGraphNode::Id{DecodingGraphNode::Type::ANCILLA, 0,
+                                                            x - 1 + y * ancilla_width};
+                    auto nodes = std::make_pair(node, graph.node(other_node).value());
+                    auto edge = std::make_shared<DecodingGraphEdge>(current_edge_id, nodes);
+                    current_edge_id++;
+                    graph.addEdge(edge);
+                    if (y == 0) {
+                        graph.addLogicalEdge(edge);
+                    }
+                }
+
+                if (y == ancilla_height - 1) {
+                    auto nodes = std::make_pair(node, bottom_boundary_nodes[x]);
+                    graph.addEdge(std::make_shared<DecodingGraphEdge>(
+                            current_edge_id, nodes));
+                    current_edge_id++;
+                }
+            }
+        }
+    }
+
+    for (auto node: graph.m_nodes) {
+        auto cluster = std::make_shared<Cluster>(node);
+        node->set_cluster(cluster);
+    }
+
+    return graph;
+}
+
 DecodingGraph DecodingGraph::rotated_surface_code(int D, int T) {
     int ancilla_height = D - 1;
     int ancilla_width = int(D / 2) + 1;
@@ -75,14 +159,20 @@ DecodingGraph DecodingGraph::rotated_surface_code(int D, int T) {
                         auto other_node_id = DecodingGraphNode::Id{DecodingGraphNode::ANCILLA, t,
                                                                    x + (y - 1) * ancilla_width - 1};
                         nodes = std::make_pair(node, graph.node(other_node_id).value());
-                        graph.addEdge(std::make_shared<DecodingGraphEdge>(current_edge_id, nodes));
+                        auto edge = std::make_shared<DecodingGraphEdge>(current_edge_id, nodes);
+                        graph.addEdge(edge);
                         current_edge_id++;
+                        if (y == 1)
+                            graph.addLogicalEdge(edge);
                     }
                     auto other_node_id = DecodingGraphNode::Id{DecodingGraphNode::ANCILLA, t,
                                                                x + (y - 1) * ancilla_width};
                     nodes = std::make_pair(node, graph.node(other_node_id).value());
-                    graph.addEdge(std::make_shared<DecodingGraphEdge>(current_edge_id, nodes));
+                    auto edge = std::make_shared<DecodingGraphEdge>(current_edge_id, nodes);
+                    graph.addEdge(edge);
                     current_edge_id++;
+                    if (y == 1)
+                        graph.addLogicalEdge(edge);
                 }
 
             }
@@ -151,6 +241,10 @@ void DecodingGraph::addEdge(std::shared_ptr<DecodingGraphEdge> edge) {
     edge->nodes().second->addEdge(edge);
 }
 
+void DecodingGraph::addLogicalEdge(std::shared_ptr<DecodingGraphEdge> edge) {
+    m_logical_edges.push_back(edge->id());
+}
+
 void DecodingGraph::addNode(std::shared_ptr<DecodingGraphNode> node) {
     m_nodes.push_back(node);
     auto id = node->id();
@@ -162,4 +256,12 @@ void DecodingGraph::addNode(std::shared_ptr<DecodingGraphNode> node) {
     } else {
         m_virtual_nodes[id.id] = node;
     }
+}
+
+std::set<int> DecodingGraph::logical_edge_ids() {
+    std::set<int> ids;
+    for (auto edge: m_logical_edges) {
+        ids.insert(edge.id);
+    }
+    return ids;
 }

@@ -69,7 +69,15 @@ int main(int argc, char *argv[]) {
             }
 #endif
 
+            /*error_edges = {
+                    graph.edge({DecodingGraphEdge::NORMAL, 0, 11}).value(),
+                    graph.edge({DecodingGraphEdge::NORMAL, 1, 15}).value(),
+                    graph.edge({DecodingGraphEdge::MEASUREMENT, 0, 10}).value(),
+            };*/
+
             auto initial_error_edges = error_edges;
+
+            //if (error_edges.size() > 5) continue;
 
             for (auto edge: error_edges) {
                 auto nodes = {edge->nodes().first, edge->nodes().second};
@@ -100,17 +108,14 @@ int main(int argc, char *argv[]) {
             }
 #endif
             // FIXME: Update checking to work?!
-            auto logical_edge_ids = graph.logical_edges();
+            auto logical_edge_ids = graph.logical_edge_ids();
             int logical = 0;
             for (auto error: error_edges) {
                 // Check if edge is relevant to final measurement
                 if (error->id().type == DecodingGraphEdge::Type::MEASUREMENT)
                     continue;
 
-                if (error->id().id > 9)
-                    continue;
-
-                if (error->id().id < 5)
+                if (std::find(logical_edge_ids.begin(), logical_edge_ids.end(), error->id().id) == logical_edge_ids.end())
                     continue;
 
                 logical += 1;
