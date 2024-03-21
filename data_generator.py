@@ -4,9 +4,9 @@ import os
 import subprocess
 import time
 
-ds = [5, 13]
+ds = [13]
 p_start = 0.00
-p_end = 0.12
+p_end = 0.05
 p_step = 0.005
 
 # create new build
@@ -17,21 +17,26 @@ data_folder = f"data_{time.strftime('%Y-%m-%d_%H-%M-%S')}"
 os.system(f"mkdir -p {data_folder}")
 error_file = open(f"{data_folder}/cerr", "w+")
 
+processes = []
+
 for decoder in ["clayg", "unionfind", "none"]:
     for d in ds:
         # split into multiple jobs, where the batches of lower probabilities are bigger
         p = p_start
         batch = 0
         while p < p_end:
-            batch_size = 20 if p < 0.05 else 10 if p < 0.8 else 5
+            batch_size = min(5, int((p_end - p) / p_step))
             command = ["cmake-build-debug/clayg", str(d), str(d), str(p), str(p + p_step * batch_size), str(p_step), decoder]
 
             print(" ".join(command))
             
             with open(f"{data_folder}/{d}_{decoder}_{p}.txt", "w+") as stdout:
                 process = subprocess.Popen(command, stdout=stdout, stderr=error_file, stdin=subprocess.PIPE, shell=False)
+                processes.append(process)
 
             p += p_step * (batch_size + 1)
             batch += 1
 
-process.wait()
+# wait for all processes to finish
+for process in processes:
+    print(process.wait())
