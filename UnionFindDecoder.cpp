@@ -6,9 +6,9 @@
 #include <iostream>
 #include "UnionFindDecoder.h"
 
-std::vector<std::shared_ptr<DecodingGraphEdge>> UnionFindDecoder::decode(DecodingGraph graph) {
+std::vector<std::shared_ptr<DecodingGraphEdge>> UnionFindDecoder::decode(std::shared_ptr<DecodingGraph> graph) {
     std::vector<std::shared_ptr<Cluster>> clusters;
-    for (auto node: graph.nodes()) {
+    for (auto node: graph->nodes()) {
         if (!node->cluster()->is_neutral())
             clusters.push_back(node->cluster());
     }

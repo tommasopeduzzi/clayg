@@ -33,30 +33,33 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    auto graph = DecodingGraph::rotated_surface_code(D, T);
+    std::vector<std::shared_ptr<DecodingGraphEdge>> error_edges {};
+
+    std::random_device rd;
+    std::mt19937 gen(rd());
 
     while (p <= p_end) {
         int logicals = 0;
         for (int i = 0; i < 10000; i++) {
-            auto graph = DecodingGraph::rotated_surface_code(D, T);
+            graph->reset();
 
-            std::vector<std::shared_ptr<DecodingGraphEdge>> error_edges{};
+            error_edges.clear();
 
-            std::random_device rd;
-            std::mt19937 gen(rd());
             // Random float between 0 and 1
             std::uniform_real_distribution<> dis(0, 1);
             for (int t = 0; t < T; t++) {
                 for (int edge = 0; edge < D * D; edge++) {
                     if (dis(gen) <= p) {
                         auto id = DecodingGraphEdge::Id{DecodingGraphEdge::Type::NORMAL, t, edge};
-                        error_edges.push_back(graph.edge(id).value());
+                        error_edges.push_back(graph->edge(id).value());
                     }
                 }
                 if (t == T - 1) continue;
                 for (int edge = 0; edge < (D - 1) * (int(D / 2) + 1); edge++) {
                     if (dis(gen) <= p) {
                         auto id = DecodingGraphEdge::Id{DecodingGraphEdge::Type::MEASUREMENT, t, edge};
-                        error_edges.push_back(graph.edge(id).value());
+                        error_edges.push_back(graph->edge(id).value());
                     }
                 }
             }
@@ -69,15 +72,7 @@ int main(int argc, char *argv[]) {
             }
 #endif
 
-            /*error_edges = {
-                    graph.edge({DecodingGraphEdge::NORMAL, 0, 11}).value(),
-                    graph.edge({DecodingGraphEdge::NORMAL, 1, 15}).value(),
-                    graph.edge({DecodingGraphEdge::MEASUREMENT, 0, 10}).value(),
-            };*/
-
             auto initial_error_edges = error_edges;
-
-            //if (error_edges.size() > 5) continue;
 
             for (auto edge: error_edges) {
                 auto nodes = {edge->nodes().first, edge->nodes().second};
@@ -108,7 +103,7 @@ int main(int argc, char *argv[]) {
             }
 #endif
             // FIXME: Update checking to work?!
-            auto logical_edge_ids = graph.logical_edge_ids();
+            auto logical_edge_ids = graph->logical_edge_ids();
             int logical = 0;
             for (auto error: error_edges) {
                 // Check if edge is relevant to final measurement

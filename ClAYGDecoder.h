@@ -16,11 +16,11 @@ class ClAYGDecoder : private UnionFindDecoder, public virtual Decoder {
 public:
     ClAYGDecoder();
 
-    std::vector<std::shared_ptr<DecodingGraphEdge>> decode(DecodingGraph graph) override;
+    std::vector<std::shared_ptr<DecodingGraphEdge>> decode(std::shared_ptr<DecodingGraph> graph) override;
 
-    std::vector<std::shared_ptr<DecodingGraphEdge>> clean(DecodingGraph &graph, std::vector<std::shared_ptr<Cluster>> &clusters);
+    std::vector<std::shared_ptr<DecodingGraphEdge>> clean(std::vector<std::shared_ptr<Cluster>> &clusters);
 
-    void add(DecodingGraph& graph, std::vector<std::shared_ptr<Cluster>> &clusters, std::shared_ptr<DecodingGraphNode> node);
+    void add(std::shared_ptr<DecodingGraph> graph, std::vector<std::shared_ptr<Cluster>> &clusters, std::shared_ptr<DecodingGraphNode> node);
 
     void reset(std::shared_ptr<Cluster> cluster, std::vector<std::shared_ptr<Cluster>> &clusters);
 };

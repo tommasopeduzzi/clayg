@@ -16,7 +16,7 @@ class UnionFindDecoder : public virtual Decoder {
 public:
     UnionFindDecoder() {}
 
-    std::vector<std::shared_ptr<DecodingGraphEdge>> decode(DecodingGraph graph) override;
+    std::vector<std::shared_ptr<DecodingGraphEdge>> decode(std::shared_ptr<DecodingGraph> graph) override;
 
     std::set<std::shared_ptr<DecodingGraphEdge>> grow(std::shared_ptr<Cluster> cluster);
 

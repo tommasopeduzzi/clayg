@@ -115,8 +115,8 @@ class DecodingGraph {
 public:
     DecodingGraph() : m_ancilla_nodes({}), m_virtual_nodes({}), m_edges({}) {}
 
-    static DecodingGraph surface_code(int D, int T);
-    static DecodingGraph rotated_surface_code(int D, int T);
+    static std::shared_ptr<DecodingGraph> surface_code(int D, int T);
+    static std::shared_ptr<DecodingGraph> rotated_surface_code(int D, int T);
 
     const int ancilla_count_per_layer() { return m_ancilla_count_per_layer; }
 
@@ -139,6 +139,8 @@ public:
     std::set<int> logical_edge_ids();
 
     std::optional<std::shared_ptr<DecodingGraphEdge>> edge(DecodingGraphEdge::Id id);
+
+    void reset();
 };
 
 
