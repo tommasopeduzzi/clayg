@@ -37,11 +37,6 @@ std::vector<std::shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(DecodingGra
 
     std::vector<std::shared_ptr<Cluster>> clusters;
 
-    // FIXME: Do we actually need to keep track of all clusters?
-    for (auto node : graph.nodes()) {
-        clusters.push_back(node->cluster());
-    }
-
     std::vector<std::shared_ptr<DecodingGraphEdge>> error_edges;
 
     int g = 1;
@@ -55,7 +50,8 @@ std::vector<std::shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(DecodingGra
         for (auto node: nodes) {
             add(graph, clusters, node);
         }
-        // clean(graph, clusters);
+        auto new_error_edges = clean(graph, clusters);
+        error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
         for (int _ = 0; _ < g; _++) {
             std::set<std::shared_ptr<DecodingGraphEdge>> fusion_edges;
             for (auto cluster: clusters) {
@@ -65,9 +61,22 @@ std::vector<std::shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(DecodingGra
             }
             merge(fusion_edges, clusters);
         }
-        auto new_error_edges = clean(graph, clusters);
+        new_error_edges = clean(graph, clusters);
         error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
     }
+
+    while (!Cluster::all_clusters_are_neutral(clusters)) {
+        std::set<std::shared_ptr<DecodingGraphEdge>> fusion_edges;
+        for (auto cluster: clusters) {
+            if (cluster->is_neutral()) continue;
+            auto new_fusion_edges = grow(cluster);
+            fusion_edges.insert(new_fusion_edges.begin(), new_fusion_edges.end());
+        }
+        merge(fusion_edges, clusters);
+    }
+
+    auto new_error_edges = clean(graph, clusters);
+    error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
 
     return error_edges;
 }
@@ -82,14 +91,15 @@ void ClAYGDecoder::add(DecodingGraph &graph, std::vector<std::shared_ptr<Cluster
         node->cluster()->addMarkedNode(node);
     else
         node->cluster()->removeMarkedNode(node);
+    if (!node->cluster()->is_neutral() && !std::count(clusters.begin(), clusters.end(), node->cluster()))
+        clusters.push_back(node->cluster());
 }
 
 std::vector<std::shared_ptr<DecodingGraphEdge>> ClAYGDecoder::clean(DecodingGraph &graph, std::vector<std::shared_ptr<Cluster>> &clusters) {
     std::vector<std::shared_ptr<DecodingGraphEdge>> error_edges;
     std::vector<std::shared_ptr<Cluster>> clusters_to_remove;
     for (auto cluster: clusters) {
-        if (!cluster->is_neutral() || cluster->marked_nodes().size() == 0) continue;
-
+        if (!cluster->is_neutral()) continue;
 
         auto new_error_edges = m_peeling_decoder.peel(cluster);
         error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
@@ -109,7 +119,6 @@ void ClAYGDecoder::reset(std::shared_ptr<Cluster> cluster, std::vector<std::shar
     for (auto node: cluster->nodes()) {
         node->set_marked(false);
         node->set_cluster(std::make_shared<Cluster>(node));
-        clusters.push_back(node->cluster());
     }
 
     for (auto edge: cluster->edges() ) {
