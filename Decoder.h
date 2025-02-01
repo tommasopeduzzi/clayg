@@ -9,6 +9,8 @@
 
 class Decoder {
 public:
+    virtual ~Decoder() = default;
+
     virtual std::vector<std::shared_ptr<DecodingGraphEdge>> decode(std::shared_ptr<DecodingGraph> graph) {
         return {};
     };

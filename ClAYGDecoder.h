@@ -10,19 +10,19 @@
 #include "Decoder.h"
 
 // ClAYGDecoder inherits from UnionFind
-class ClAYGDecoder : private UnionFindDecoder, public virtual Decoder {
-    PeelingDecoder m_peeling_decoder;
-
+// It owns the clusters and the graph, but not its constituents
+class ClAYGDecoder final : private UnionFindDecoder, public virtual Decoder {
 public:
-    ClAYGDecoder();
+    ClAYGDecoder() = default;
 
     std::vector<std::shared_ptr<DecodingGraphEdge>> decode(std::shared_ptr<DecodingGraph> graph) override;
 
-    std::vector<std::shared_ptr<DecodingGraphEdge>> clean(std::vector<std::shared_ptr<Cluster>> &clusters);
+    static std::vector<std::shared_ptr<DecodingGraphEdge>> clean(std::vector<std::shared_ptr<Cluster>>& clusters,
+                                                                 const std::shared_ptr<DecodingGraph>& decoding_graph);
 
-    void add(std::shared_ptr<DecodingGraph> graph, std::vector<std::shared_ptr<Cluster>> &clusters, std::shared_ptr<DecodingGraphNode> node);
+    static void add(const std::shared_ptr<DecodingGraph>& graph, std::vector<std::shared_ptr<Cluster>> &clusters, std::shared_ptr<DecodingGraphNode> node);
 
-    void reset(std::shared_ptr<Cluster> cluster, std::vector<std::shared_ptr<Cluster>> &clusters);
+    static void reset(const std::shared_ptr<Cluster>& cluster);
 };
 
 

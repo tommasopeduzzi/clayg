@@ -8,80 +8,116 @@
 #include <iostream>
 #include "PeelingDecoder.h"
 
-std::vector<std::shared_ptr<DecodingGraphEdge>>
-PeelingDecoder::decode(std::vector<std::shared_ptr<Cluster>> &clusters) {
-    std::vector<std::shared_ptr<DecodingGraphEdge>> error_edges = {};
-    for (auto cluster: clusters) {
-        auto new_error_edges = peel(cluster);
+using namespace std;
+
+vector<shared_ptr<DecodingGraphEdge>> PeelingDecoder::decode(vector<shared_ptr<Cluster>>& clusters,
+                                                             const shared_ptr<DecodingGraph>&
+                                                             decoding_graph)
+{
+    vector<shared_ptr<DecodingGraphEdge>> error_edges = {};
+    for (auto& cluster : clusters)
+    {
+        if (cluster->marked_nodes().empty())
+        {
+            continue;
+        }
+        auto new_error_edges = peel(cluster, decoding_graph);
         error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
     }
     return error_edges;
 }
 
-std::pair<std::shared_ptr<DecodingGraphNode>, std::shared_ptr<DecodingGraphEdge>>
-PeelingDecoder::find_next_spanning_forest_node(std::shared_ptr<Cluster> &cluster,
-                                               std::vector<std::shared_ptr<DecodingGraphNode>> &spanning_forest_nodes) {
-#ifdef DEBUG
-    std::cout << "Nodes not in cluster: ";
-    for (auto node: cluster->nodes()) {
-        if (std::find(spanning_forest_nodes.begin(), spanning_forest_nodes.end(), node) ==
-            spanning_forest_nodes.end()) {
-            std::cout << node->id().id << " ";
-        }
-    }
-    std::cout << std::endl;
-#endif
-#undef DEBUG
-
-    for (auto node: spanning_forest_nodes) {
-        for (auto edge: node->edges()) {
-            auto other_node = edge->other_node(node);
-            // Check that other_node is in the cluster, but not yet in the spanning forest
-            if (other_node->cluster() != cluster) {
-                continue;
-            }
-            // FIXME: Use lookup
-            if (std::find(spanning_forest_nodes.begin(), spanning_forest_nodes.end(), other_node) !=
-                spanning_forest_nodes.end()) {
-                continue;
-            }
-
-            spanning_forest_nodes.push_back(other_node);
-            return std::make_pair(node, edge);
-        }
-    }
-}
-
-std::vector<std::shared_ptr<DecodingGraphEdge>> PeelingDecoder::peel(std::shared_ptr<Cluster> cluster) {
-    std::vector<std::shared_ptr<DecodingGraphNode>> spanning_forest_nodes = {};
+vector<shared_ptr<DecodingGraphEdge>> PeelingDecoder::peel(shared_ptr<Cluster>& cluster,
+                                                           const shared_ptr<DecodingGraph>&
+                                                           decoding_graph)
+{
+    vector<shared_ptr<DecodingGraphNode>> spanning_forest_nodes = {};
 
     // NOTE: vector<pair<tree_nde, edge>>
-    std::vector<std::pair<std::shared_ptr<DecodingGraphNode>, std::shared_ptr<DecodingGraphEdge>>> spanning_forest_edges = {};
+    vector<pair<shared_ptr<DecodingGraphNode>, shared_ptr<DecodingGraphEdge>>> spanning_forest_edges
+        = {};
 
-    std::shared_ptr<DecodingGraphNode> start_node = nullptr;
-    for (auto node: cluster->nodes()) {
-        if (node->id().type == DecodingGraphNode::Type::VIRTUAL) {
+    shared_ptr<DecodingGraphNode> start_node = nullptr;
+    for (const auto& node : cluster->nodes())
+    {
+        ;
+        if (node->id().type == DecodingGraphNode::Type::VIRTUAL)
+        {
             start_node = node;
             break;
         }
     }
-    if (start_node == nullptr) {
-        start_node = cluster->root();
+    if (start_node == nullptr)
+    {
+        start_node = cluster->root().lock();
     }
     spanning_forest_nodes.push_back(start_node);
 
-    while (spanning_forest_edges.size() < cluster->nodes().size() - 1) {
-        spanning_forest_edges.push_back(find_next_spanning_forest_node(cluster, spanning_forest_nodes));
+    while (spanning_forest_edges.size() < cluster->nodes().size() - 1)
+    {
+        bool edge_added = false; // Flag to check if an edge was added in this iteration
+
+        for (const auto& current_node : spanning_forest_nodes)
+        {
+            shared_ptr<DecodingGraphEdge> edge;
+            shared_ptr<DecodingGraphNode> other_node;
+
+            for (const auto& edge_weak_ptr : current_node->edges())
+            {
+                edge = edge_weak_ptr.lock();
+                other_node = edge->other_node(current_node).lock();
+
+                // check that node is in the same cluster
+                if (!other_node->cluster().has_value())
+                {
+                    continue;
+                }
+                if (other_node->cluster().value().lock() != cluster)
+                {
+                    continue;
+                }
+
+                bool already_in_forest = false;
+                for (const auto& spanning_forest_node : spanning_forest_nodes)
+                {
+                    if (spanning_forest_node->id() == other_node->id())
+                    {
+                        already_in_forest = true;
+                        break;
+                    }
+                }
+
+                if (!already_in_forest)
+                {
+                    spanning_forest_edges.emplace_back(current_node, edge);
+                    spanning_forest_nodes.push_back(other_node);
+                    edge_added = true;
+                    break;
+                }
+            }
+
+            if (edge_added)
+            {
+                break;
+            }
+        }
+
+        if (!edge_added)
+        {
+            throw runtime_error("No valid edge found to add to the spanning forest");
+        }
     }
 
-    std::vector<std::shared_ptr<DecodingGraphEdge>> error_edges = {};
+    vector<shared_ptr<DecodingGraphEdge>> error_edges = {};
 
-    for (int i = spanning_forest_edges.size() - 1; i >= 0; i--) {
+    for (int i = static_cast<int>(spanning_forest_edges.size() - 1); i >= 0; i--)
+    {
         auto tree_node = spanning_forest_edges[i].first;
-        auto edge = spanning_forest_edges[i].second;
-        auto leaf_node = edge->other_node(tree_node);
+        const auto edge = spanning_forest_edges[i].second;
+        auto leaf_node = edge->other_node(tree_node).lock();
 
-        if (leaf_node->marked()) {
+        if (leaf_node->marked())
+        {
             error_edges.push_back(edge);
             tree_node->set_marked(!tree_node->marked());
             leaf_node->set_marked(false);

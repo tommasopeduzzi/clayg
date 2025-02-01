@@ -5,15 +5,12 @@
 #include <iostream>
 #include "ClAYGDecoder.h"
 
-ClAYGDecoder::ClAYGDecoder() {
-    m_peeling_decoder = PeelingDecoder();
-}
+using namespace std;
 
-std::vector<std::shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(std::shared_ptr<DecodingGraph> graph) {
-    std::vector<std::shared_ptr<DecodingGraphNode>> marked_nodes;
+vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph) {
+    vector<shared_ptr<DecodingGraphNode>> marked_nodes;
 
-
-    for (auto node: graph->nodes()) {
+    for (const auto& node: graph->nodes()) {
         if (node->marked()) {
             marked_nodes.push_back(node);
         }
@@ -21,7 +18,7 @@ std::vector<std::shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(std::shared
 
     struct decoding_graph_node_comparator
     {
-        inline bool operator() (const std::shared_ptr<DecodingGraphNode>& node1, const std::shared_ptr<DecodingGraphNode>& node2)
+        inline bool operator() (const shared_ptr<DecodingGraphNode>& node1, const shared_ptr<DecodingGraphNode>& node2)
         {
             if (node1->id().round == node2->id().round) {
                 return node1->id().id < node2->id().id;
@@ -30,103 +27,123 @@ std::vector<std::shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(std::shared
         }
     };
 
-    std::sort(marked_nodes.begin(), marked_nodes.end(), decoding_graph_node_comparator());
+    sort(marked_nodes.begin(), marked_nodes.end(), decoding_graph_node_comparator());
 
-    int rounds = graph->t();
-    graph = DecodingGraph::rotated_surface_code(graph->d(), 1);
+    const int rounds = graph->t();
+    auto flattened_graph = DecodingGraph::rotated_surface_code(graph->d(), 1);
 
-    std::vector<std::shared_ptr<Cluster>> clusters;
+    vector<shared_ptr<Cluster>> clusters;
 
-    std::vector<std::shared_ptr<DecodingGraphEdge>> error_edges;
+    vector<shared_ptr<DecodingGraphEdge>> error_edges;
 
     int g = 1;
     for (int round = 0; round <= rounds; round++) {
-        std::vector<std::shared_ptr<DecodingGraphNode>> nodes;
-        for (auto node: marked_nodes) {
-            if (node->id().round == round && node->marked() && node->id().type == DecodingGraphNode::Type::ANCILLA) {
+        vector<shared_ptr<DecodingGraphNode>> nodes;
+        for (const auto& node: marked_nodes) {
+            if (node->id().round == round && node->marked()) {
                 nodes.push_back(node);
             }
         }
-        for (auto node: nodes) {
-            add(graph, clusters, node);
+        for (const auto& node: nodes) {
+            add(flattened_graph, clusters, node);
         }
-        auto new_error_edges = clean(clusters);
+        auto new_error_edges = clean(clusters, flattened_graph);
         error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
         for (int _ = 0; _ < g; _++) {
-            std::set<std::shared_ptr<DecodingGraphEdge>> fusion_edges;
-            for (auto cluster: clusters) {
+            vector<DecodingGraphEdge::FusionEdge> fusion_edges;
+            for (const auto& cluster: clusters) {
                 if (cluster->is_neutral()) continue;
                 auto new_fusion_edges = grow(cluster);
-                fusion_edges.insert(new_fusion_edges.begin(), new_fusion_edges.end());
+                for (const auto& fusion_edge : new_fusion_edges) {
+                    fusion_edges.push_back(fusion_edge);
+                }
             }
             merge(fusion_edges, clusters);
         }
-        new_error_edges = clean(clusters);
+        new_error_edges = clean(clusters, flattened_graph);
         error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
     }
 
     while (!Cluster::all_clusters_are_neutral(clusters)) {
-        std::set<std::shared_ptr<DecodingGraphEdge>> fusion_edges;
-        for (auto cluster: clusters) {
+        vector<DecodingGraphEdge::FusionEdge> fusion_edges;
+        for (const auto& cluster: clusters) {
             if (cluster->is_neutral()) continue;
             auto new_fusion_edges = grow(cluster);
-            fusion_edges.insert(new_fusion_edges.begin(), new_fusion_edges.end());
+            for (const auto& fusion_edge : new_fusion_edges) {
+                fusion_edges.push_back(fusion_edge);
+            }
         }
         merge(fusion_edges, clusters);
     }
 
-    auto new_error_edges = clean(clusters);
+    auto new_error_edges = clean(clusters, flattened_graph);
     error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
 
     return error_edges;
 }
 
-void ClAYGDecoder::add(std::shared_ptr<DecodingGraph> graph, std::vector<std::shared_ptr<Cluster>> &clusters, std::shared_ptr<DecodingGraphNode> node) {
+void ClAYGDecoder::add(const shared_ptr<DecodingGraph>& graph, vector<shared_ptr<Cluster>> &clusters, shared_ptr<DecodingGraphNode> node) {
     // Find corresponding node in the flattened decoding graph
     auto id = node->id();
     id.round = 0;
     node = graph->node(id).value();
     node->set_marked(!node->marked());
-    if (node->marked())
-        node->cluster()->addMarkedNode(node);
+    if (node->cluster().has_value())
+    {
+        auto cluster = node->cluster().value().lock();
+        if (node->marked())
+        {
+            cluster->add_marked_node(node);
+        }
+        else
+        {
+            cluster->remove_marked_node(node);
+        }
+    }
     else
-        node->cluster()->removeMarkedNode(node);
-    if (!node->cluster()->is_neutral() && !std::count(clusters.begin(), clusters.end(), node->cluster()))
-        clusters.push_back(node->cluster());
+    {
+        auto new_cluster = make_shared<Cluster>(node);
+        node->set_cluster(new_cluster);
+        if (node->marked())
+        {
+            new_cluster->add_marked_node(node);
+        }
+        if (node->id().type == DecodingGraphNode::VIRTUAL)
+        {
+            new_cluster->add_virtual_node(node);
+        }
+        clusters.push_back(new_cluster);
+    }
 }
 
-std::vector<std::shared_ptr<DecodingGraphEdge>> ClAYGDecoder::clean(std::vector<std::shared_ptr<Cluster>> &clusters) {
-    std::vector<std::shared_ptr<DecodingGraphEdge>> error_edges;
-    std::vector<std::shared_ptr<Cluster>> clusters_to_remove;
-    for (auto cluster: clusters) {
-        if (!cluster->is_neutral()) continue;
+vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::clean(vector<shared_ptr<Cluster>>& clusters,
+                                                                    const shared_ptr<DecodingGraph>&
+                                                                    decoding_graph) {
+    vector<shared_ptr<DecodingGraphEdge>> error_edges;
+    vector<shared_ptr<Cluster>> new_clusters;
+    for (auto& cluster: clusters) {
+        if (!cluster->is_neutral())
+        {
+            new_clusters.push_back(move(cluster));
+            continue;
+        }
 
-        auto new_error_edges = m_peeling_decoder.peel(cluster);
+        auto new_error_edges = PeelingDecoder::peel(cluster, decoding_graph);
         error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
 
-        // remove cluster from clusters
-        reset(cluster, clusters);
-        clusters_to_remove.push_back(cluster);
+        for (const auto& node: cluster->nodes()) {
+            node->set_cluster(nullopt);
+        }
+        for (const auto& edge: cluster->edges())
+        {
+            edge->reset_growth();
+        }
+
+        for (const auto& boundary_edge: cluster->boundary())
+        {
+            boundary_edge.edge->reset_growth();
+        }
     }
-    for (auto cluster : clusters_to_remove) {
-        clusters.erase(std::find(clusters.begin(), clusters.end(), cluster));
-    }
+    clusters = move(new_clusters);
     return error_edges;
-}
-
-void ClAYGDecoder::reset(std::shared_ptr<Cluster> cluster, std::vector<std::shared_ptr<Cluster>> &clusters) {
-
-    for (auto node: cluster->nodes()) {
-        node->set_marked(false);
-        node->set_cluster(std::make_shared<Cluster>(node));
-    }
-
-    for (auto edge: cluster->edges() ) {
-        edge->add_growth(-edge->growth());
-    }
-
-    for (auto edge: cluster->boundary()) {
-        edge->add_growth(-edge->growth());
-    }
-
 }

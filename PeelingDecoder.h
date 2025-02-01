@@ -9,17 +9,19 @@
 #include "DecodingGraph.h"
 
 class PeelingDecoder {
-    DecodingGraph m_graph;
-
 public:
-    PeelingDecoder() {}
+    PeelingDecoder() = default;
 
-    std::vector<std::shared_ptr<DecodingGraphEdge>> decode(std::vector<std::shared_ptr<Cluster>> &clusters);
+    static std::vector<std::shared_ptr<DecodingGraphEdge>> decode(std::vector<std::shared_ptr<Cluster>>& clusters,
+                                                                  const std::shared_ptr<DecodingGraph>& decoding_graph);
 
-    std::vector<std::shared_ptr<DecodingGraphEdge>> peel(std::shared_ptr<Cluster> cluster);
+    static std::vector<std::shared_ptr<DecodingGraphEdge>> peel(std::shared_ptr<Cluster>& cluster,
+                                                                const std::shared_ptr<DecodingGraph>& decoding_graph);
 
-    std::pair<std::shared_ptr<DecodingGraphNode>, std::shared_ptr<DecodingGraphEdge>> find_next_spanning_forest_node(std::shared_ptr<Cluster> &cluster,
-                                                                                   std::vector<std::shared_ptr<DecodingGraphNode>> &spanning_forest_nodes);
+    static std::pair<std::shared_ptr<DecodingGraphNode>, std::shared_ptr<DecodingGraphEdge>>
+    find_next_spanning_forest_node(std::shared_ptr<Cluster>& cluster,
+                                   std::vector<std::shared_ptr<DecodingGraphNode>>& spanning_forest_nodes, const std::shared_ptr<
+                                       DecodingGraph>& decoding_graph);
 };
 
 
