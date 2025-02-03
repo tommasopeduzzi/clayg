@@ -5,16 +5,21 @@
 #ifndef CLAYG_DECODER_H
 #define CLAYG_DECODER_H
 
+#include <string>
+
 #include "DecodingGraph.h"
 
 class Decoder {
 public:
     virtual ~Decoder() = default;
 
-    virtual std::vector<std::shared_ptr<DecodingGraphEdge>> decode(std::shared_ptr<DecodingGraph> graph) {
+    virtual std::vector<std::shared_ptr<DecodingGraphEdge>> decode(std::shared_ptr<DecodingGraph> graph, bool dump = false, std::string run_id = "") {
         return {};
     };
 
+    virtual void dump(const std::string& filename)
+    {
+    }
 };
 
 

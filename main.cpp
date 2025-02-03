@@ -10,9 +10,9 @@ using namespace std;
 int main(int argc, char* argv[])
 {
     // Parse command line arguments in format D T p_start p_end p_step decoder
-    if (argc != 7)
+    if (argc != 8)
     {
-        cerr << "Usage: " << argv[0] << " D T p_start p_end p_step decoder" << endl;
+        cerr << "Usage: " << argv[0] << " D T p_start p_end p_step decoder dump" << endl;
         return 1;
     }
 
@@ -22,6 +22,7 @@ int main(int argc, char* argv[])
     double p_end = stod(argv[4]);
     double p_step = stod(argv[5]);
     string decoder_type = argv[6];
+    bool dump = string(argv[7]) == "dump";
 
     unique_ptr<Decoder> decoder = {};
     if (decoder_type == "none")
@@ -42,11 +43,14 @@ int main(int argc, char* argv[])
     }
 
     auto graph = DecodingGraph::rotated_surface_code(D, T);
+    graph->dump("graphs/graph.txt");
     vector<shared_ptr<DecodingGraphEdge>> error_edges{};
     vector<DecodingGraphEdge::Id> error_edge_ids{};
 
     random_device rd;
     mt19937 gen(rd());
+
+    int run_id = 0;
 
     auto uf_decoder = make_unique<UnionFindDecoder>();
     auto clayg_decoder = make_unique<ClAYGDecoder>();
@@ -79,7 +83,6 @@ int main(int argc, char* argv[])
                     }
                 }
             }
-
 
             graph->reset();
             error_edges.clear();
@@ -126,7 +129,13 @@ int main(int argc, char* argv[])
                 }
             }
 
-            auto corrections = decoder->decode(graph);
+            if (dump)
+            {
+                // make directory in runs
+                system(("mkdir -p runs/" + to_string(run_id)).c_str());
+            }
+
+            auto corrections = decoder->decode(graph, dump, to_string(run_id));
 
             for (const auto& error : corrections)
             {
@@ -141,6 +150,25 @@ int main(int argc, char* argv[])
             }
             logical %= 2;
             logicals += logical;
+            run_id += 1;
+            if (logical == 1)
+            {
+                cout << "Error detected:" << endl;
+                for (const auto& edge : error_edges)
+                {
+                    string type;
+                    switch (edge->id().type)
+                    {
+                    case DecodingGraphEdge::Type::MEASUREMENT:
+                        type = "Measurement";
+                        break;
+                    case DecodingGraphEdge::Type::NORMAL:
+                        type = "Normal";
+                        break;
+                    }
+                    cout << "Type: " << type << ", Round: "  << edge->id().round << ", Id: " << edge->id().id << endl;
+                }
+            }
         }
 
         double error_rate = static_cast<double>(logicals) / 10000;

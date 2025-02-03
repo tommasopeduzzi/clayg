@@ -172,6 +172,8 @@ public:
     std::optional<std::shared_ptr<DecodingGraphEdge>> edge(DecodingGraphEdge::Id id);
 
     void reset();
+
+    void dump(const std::string& filename);
 };
 
 

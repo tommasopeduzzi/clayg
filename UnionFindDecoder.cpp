@@ -6,29 +6,38 @@
 #include <iostream>
 #include "UnionFindDecoder.h"
 
+#include <fstream>
+
 using namespace std;
 
-vector<shared_ptr<DecodingGraphEdge>> UnionFindDecoder::decode(const shared_ptr<DecodingGraph> graph)
+vector<shared_ptr<DecodingGraphEdge>> UnionFindDecoder::decode(const shared_ptr<DecodingGraph> graph, bool dump,
+                                                               string run_id)
 {
+    if (dump)
+    {
+        graph->dump("runs/" + run_id + "/graph.txt");
+    }
+
     // Initialize clusters
-    vector<shared_ptr<Cluster>> clusters;
+    m_clusters = {};
     for (const auto& node : graph->nodes())
     {
         if (node->marked())
         {
             auto cluster = make_shared<Cluster>(node);
-            clusters.push_back(cluster);
+            m_clusters.push_back(cluster);
             node->set_cluster(cluster);
             cluster->add_marked_node(node);
         }
     }
 
     // Main Union Find loop
-    while (!Cluster::all_clusters_are_neutral(clusters))
+    int growth_steps = 0;
+    while (!Cluster::all_clusters_are_neutral(m_clusters))
     {
-        graph->node(DecodingGraphNode::Id{DecodingGraphNode::ANCILLA, 4,2});
+        graph->node(DecodingGraphNode::Id{DecodingGraphNode::ANCILLA, 4, 2});
         vector<DecodingGraphEdge::FusionEdge> fusion_edges;
-        for (const auto& cluster : clusters)
+        for (const auto& cluster : m_clusters)
         {
             auto new_fusion_edges = grow(cluster);
             for (const auto& fusion_edge : new_fusion_edges)
@@ -36,10 +45,13 @@ vector<shared_ptr<DecodingGraphEdge>> UnionFindDecoder::decode(const shared_ptr<
                 fusion_edges.push_back(fusion_edge);
             }
         }
-        merge(fusion_edges, clusters);
+        if (dump)
+            this->dump("runs/" + run_id + "/clusters_" + to_string(growth_steps) + ".txt");
+        growth_steps++;
+        merge(fusion_edges);
     }
 
-    return PeelingDecoder::decode(clusters, graph);
+    return PeelingDecoder::decode(m_clusters, graph);
 }
 
 vector<DecodingGraphEdge::FusionEdge> UnionFindDecoder::grow(const shared_ptr<Cluster>& cluster)
@@ -77,8 +89,7 @@ vector<DecodingGraphEdge::FusionEdge> UnionFindDecoder::grow(const shared_ptr<Cl
 }
 
 
-void UnionFindDecoder::merge(const vector<DecodingGraphEdge::FusionEdge>& fusion_edges,
-                             vector<shared_ptr<Cluster>>& clusters)
+void UnionFindDecoder::merge(const vector<DecodingGraphEdge::FusionEdge>& fusion_edges)
 {
     for (const auto& fusion_edge : fusion_edges)
     {
@@ -145,8 +156,32 @@ void UnionFindDecoder::merge(const vector<DecodingGraphEdge::FusionEdge>& fusion
             cluster->add_boundary_edge(boundary);
         }
 
-        auto cluster_to_be_removed = find(clusters.begin(), clusters.end(), other_cluster);
-        if (cluster_to_be_removed != clusters.end())
-            clusters.erase(cluster_to_be_removed);
+        auto cluster_to_be_removed = find(m_clusters.begin(), m_clusters.end(), other_cluster);
+        if (cluster_to_be_removed != m_clusters.end())
+            m_clusters.erase(cluster_to_be_removed);
+    }
+}
+
+void UnionFindDecoder::dump(const std::string& filename)
+{
+    cout << "Dumping UnionFindDecoder to " << filename << endl;
+
+    ofstream file(filename);
+    if (!file)
+    {
+        // print out the error
+        cerr << file.rdstate() << endl;
+        cerr << "Error opening file!" << endl;
+        return;
+    }
+
+    int cluster_id = 0;
+    for (auto cluster : m_clusters)
+    {
+        for (auto edge : cluster->edges())
+        {
+            file << edge->id().type << "-" << edge->id().round << "-" << edge->id().id << "," << cluster_id << endl;
+        }
+        cluster_id++;
     }
 }

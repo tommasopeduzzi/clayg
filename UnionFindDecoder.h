@@ -10,15 +10,23 @@
 #include "PeelingDecoder.h"
 #include "Decoder.h"
 
-class UnionFindDecoder : public virtual Decoder {
+class UnionFindDecoder : public virtual Decoder
+{
+protected:
+    std::vector<std::shared_ptr<Cluster>> m_clusters;
+
 public:
-    UnionFindDecoder() {}
+    UnionFindDecoder()
+    {
+    }
 
-    std::vector<std::shared_ptr<DecodingGraphEdge>> decode(std::shared_ptr<DecodingGraph> graph) override;
+    std::vector<std::shared_ptr<DecodingGraphEdge>> decode(std::shared_ptr<DecodingGraph> graph, bool dump = false, std::string run_id = "") override;
 
-    static std::vector<DecodingGraphEdge::FusionEdge> grow(const std::shared_ptr<Cluster>& cluster);
+    std::vector<DecodingGraphEdge::FusionEdge> grow(const std::shared_ptr<Cluster>& cluster);
 
-    static void merge(const std::vector<DecodingGraphEdge::FusionEdge>& fusion_edges, std::vector<std::shared_ptr<Cluster>>& clusters);
+    void merge(const std::vector<DecodingGraphEdge::FusionEdge>& fusion_edges);
+
+    void dump(const std::string& filename) override;
 };
 
 

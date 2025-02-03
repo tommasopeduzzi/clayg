@@ -4,6 +4,9 @@
 
 #include "DecodingGraph.h"
 
+#include <fstream>
+#include <iostream>
+
 using namespace std;
 
 shared_ptr<DecodingGraph> DecodingGraph::surface_code(int D, int T) {
@@ -102,7 +105,7 @@ shared_ptr<DecodingGraph> DecodingGraph::rotated_surface_code(int D, int T) {
         auto top_node = make_shared<DecodingGraphNode>(
                 DecodingGraphNode::Id{DecodingGraphNode::Type::VIRTUAL, 0, i});
         auto bottom_node = make_shared<DecodingGraphNode>(
-                DecodingGraphNode::Id{DecodingGraphNode::Type::VIRTUAL, 0, i + D - 2});
+                DecodingGraphNode::Id{DecodingGraphNode::Type::VIRTUAL, 0, i + ancilla_width});
         graph->addNode(top_node);
         graph->addNode(bottom_node);
         top_boundary_nodes.push_back(top_node);
@@ -270,3 +273,26 @@ void DecodingGraph::reset() {
         edge->reset_growth();
     }
 }
+
+void DecodingGraph::dump(const string& filename) {
+    ofstream file(filename);
+    if (!file) {
+        // print out the error
+        cerr << file.rdstate() << endl;
+        cerr << "Error opening file!" << endl;
+        return;
+    }
+
+    for (const auto& edge : m_edges) {
+        auto [node1, node2] = edge->nodes();
+        if (auto n1 = node1.lock(), n2 = node2.lock(); n1 && n2) {
+            file << n1->id().type << "-" << n1->id().round << "-" << n1->id().id << ","
+                 << n2->id().type << "-" << n2->id().round << "-" << n2->id().id << ","
+                 << edge->id().type << "-" << edge->id().round << "-" << edge->id().id << "\n";
+        }
+    }
+
+    file.close();
+    cout << "Graph exported to " << filename << endl;
+}
+
