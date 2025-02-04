@@ -1,5 +1,6 @@
 #include <iostream>
 #include <algorithm>
+#include <fstream>
 #include <random>
 #include "DecodingGraph.h"
 #include "UnionFindDecoder.h"
@@ -43,7 +44,6 @@ int main(int argc, char* argv[])
     }
 
     auto graph = DecodingGraph::rotated_surface_code(D, T);
-    graph->dump("graphs/graph.txt");
     vector<shared_ptr<DecodingGraphEdge>> error_edges{};
     vector<DecodingGraphEdge::Id> error_edge_ids{};
 
@@ -82,6 +82,17 @@ int main(int argc, char* argv[])
                         error_edge_ids.push_back(id);
                     }
                 }
+            }
+
+            // dump errors
+            if (dump)
+            {
+                ofstream file("runs/" + to_string(run_id) + "/errors.txt");
+                for (const auto& [type, round, id] : error_edge_ids)
+                {
+                    file << type << "-" << round << "-" << id << endl;
+                }
+                file.close();
             }
 
             graph->reset();
@@ -129,13 +140,15 @@ int main(int argc, char* argv[])
                 }
             }
 
-            if (dump)
+            bool current_dump = !error_edge_ids.empty() && dump && false;
+
+            if (current_dump)
             {
                 // make directory in runs
                 system(("mkdir -p runs/" + to_string(run_id)).c_str());
             }
 
-            auto corrections = decoder->decode(graph, dump, to_string(run_id));
+            auto corrections = decoder->decode(graph, current_dump, to_string(run_id));
 
             for (const auto& error : corrections)
             {
@@ -150,7 +163,6 @@ int main(int argc, char* argv[])
             }
             logical %= 2;
             logicals += logical;
-            run_id += 1;
             if (logical == 1)
             {
                 cout << "Error detected:" << endl;
@@ -168,6 +180,7 @@ int main(int argc, char* argv[])
                     }
                     cout << "Type: " << type << ", Round: "  << edge->id().round << ", Id: " << edge->id().id << endl;
                 }
+                run_id += 1;
             }
         }
 

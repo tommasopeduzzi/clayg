@@ -1,4 +1,5 @@
 import argparse
+import os
 from math import ceil
 import matplotlib
 from matplotlib.widgets import CheckButtons, Button
@@ -17,7 +18,13 @@ parser.add_argument("run_id", help="run id to visualize")
 parser.add_argument("output", help="output file")
 args = parser.parse_args()
 
+edge_visibility = True
+edge_labels_visibility = False
+node_labels_visibility = False
+
 graph_file = f"runs/{args.run_id}/graph.txt"
+marked_nodes_file = f"runs/{args.run_id}/marked_nodes.txt"
+error_edges_file = f"runs/{args.run_id}/errors.txt"
 def clusters_file(step):
     return  f"runs/{args.run_id}/clusters_{step}.txt"
 
@@ -48,30 +55,9 @@ with open(graph_file, "r") as f:
 
 # Construct graph
 G = nx.Graph()
-edges = {}
 edge_id_to_tuple = {}
 for node1, node2, edge in graph:
-    G.add_edge(node1, node2)
-    edge_tuple = frozenset({node1, node2})
-    edges[edge_tuple] = edge
-    edge_id_to_tuple[edge] = edge_tuple
-
-# Read cluster file
-def parse_clusters(clusters_file):
-    new_edge_clusters = {}
-    with open(clusters_file, "r") as f:
-        for line in f:
-            edge_id, cluster_id = line.strip().split(",")
-            new_edge_clusters[parse_edge(edge_id)] = int(cluster_id)
-    return new_edge_clusters
-
-clusters_step = 0
-edge_clusters = parse_clusters(clusters_file(clusters_step))
-
-# Generate colors dynamically
-unique_clusters = sorted(set(edge_clusters.values()))
-cmap = plt.get_cmap("hsv")
-colors_map = {cluster: cmap(i / max(1, len(unique_clusters) - 1)) for i, cluster in enumerate(unique_clusters)}
+    G.add_edge(node1, node2, edge=edge)
 
 # Compute layout
 rounds = max([node[1] for node in G.nodes()]) + 1
@@ -105,40 +91,79 @@ for i, node in enumerate(G.nodes()):
     x, y, z = pos[node]
     ax.scatter(x, y, z, color=node_colors[i], s=50)
 
-all_edges = []
-normal_edges = []
-node_labels = []
+error_edges = []
+with open(error_edges_file, "r") as f:
+    for line in f:
+        error_edges.append(parse_edge(line.strip()))
+
+all_edges = {}
 edge_labels = []
 # Draw edges with cluster colors
-for node1, node2 in G.edges():
-    edge_tuple = frozenset({node1, node2})
-    edge = edges[edge_tuple]
+clusters_step = 0
+# Read cluster file
+def parse_clusters(clusters_file):
+    new_edge_clusters = {}
+    with open(clusters_file, "r") as f:
+        for line in f:
+            edge_id, cluster_id = line.strip().split(",")
+            new_edge_clusters[parse_edge(edge_id)] = int(cluster_id)
+    return new_edge_clusters
+
+def update_cluster():
+    """ Updates the cluster visualization based on the current clusters_step """
+    # Read the new cluster file based on clusters_step
+    edge_clusters = parse_clusters(clusters_file(clusters_step))
+
+    # Update edge colors dynamically
+    unique_clusters = sorted(set(edge_clusters.values()))
+    cmap = plt.get_cmap("hsv")
+    colors_map = {cluster: cmap(i / max(1, len(unique_clusters) - 1)) for i, cluster in enumerate(unique_clusters)}
+
+    # Draw edges with updated colors
+    for edge, line in all_edges.items():
+        cluster = edge_clusters.get(edge, -1)
+        color = colors_map.get(cluster, "black")
+        alpha = 0.5 if cluster == -1 else 1
+        line.set_color(color)
+        line.set_alpha(alpha)
+        if cluster == -1:
+            line.set_visible(edge_visibility)
+        else:
+            line.set_visible(True)
+
+for node1, node2, edge in G.edges().data("edge"):
     x1, y1, z1 = pos[node1]
     x2, y2, z2 = pos[node2]
-    cluster = edge_clusters.get(edge, -1)
-    color = colors_map.get(cluster, "black")
-    alpha = 0.5 if cluster == -1 else 1
-    line_list = ax.plot([x1, x2], [y1, y2], [z1, z2], color=color, alpha=alpha, linewidth=1, linestyle='dotted' if edge[0] == "Measurement" else 'solid')
-    all_edges.append(line_list)
-    if cluster == -1:
-        normal_edges.append(line_list)
+    line = ax.plot([x1, x2], [y1, y2], [z1, z2], linewidth=1, linestyle='dotted' if edge[0] == "Measurement" else 'solid')[0]
+    all_edges[edge] = line
+    if edge in error_edges:
+        # second thick red line
+        ax.plot([x1, x2], [y1, y2], [z1, z2], linewidth=2, color="red", zorder=-1)
     if edge[0] == "Normal":
-        edge_labels.append(ax.text((x1+x2)/2, (y1+y2)/2, (z1+z2)/2, f"{edge[1]}-{edge[2]}", size=10, zorder=1))
+        edge_labels.append(ax.text((x1+x2)/2, (y1+y2)/2, (z1+z2)/2, f"{edge[1]}-{edge[2]}", size=10, zorder=1, visible=edge_labels_visibility))
+update_cluster()
 
-# Labels
+# Node Labels
+node_labels = []
 for node in G.nodes():
     x, y, z = pos[node]
-    node_labels.append(ax.text(x, y, z, f"{node[2]}", size=10, zorder=1))
+    node_labels.append(ax.text(x, y, z, f"{node[2]}", size=10, zorder=1, visible=node_labels_visibility))
 
 def toggle_visibility(label):
+    global edge_visibility, edge_labels_visibility, node_labels_visibility
     if label == "Edges":
-        for line_list in normal_edges:
-            for line in line_list:
+        edge_visibility = not edge_visibility
+        edge_clusters = parse_clusters(clusters_file(clusters_step))
+        for edge, line in all_edges.items():
+            cluster = edge_clusters.get(edge, -1)
+            if cluster == -1 and not edge in error_edges:
                 line.set_visible(not line.get_visible())
     elif label == "Edge Labels":
+        edge_labels_visibility = not edge_labels_visibility
         for text in edge_labels:
             text.set_visible(not text.get_visible())
     elif label == "Node Labels":
+        node_labels_visibility = not node_labels_visibility
         for text in node_labels:
             text.set_visible(not text.get_visible())
     plt.draw()
@@ -146,7 +171,7 @@ def toggle_visibility(label):
 # Create checkboxes
 plt.subplots_adjust(left=0.25)  # Adjust layout for checkbox placement
 ax_checkbox = plt.axes((0.02, 0.5, 0.15, 0.15))  # Position checkbox panel
-check = CheckButtons(ax_checkbox, ["Edges", "Edge Labels", "Node Labels"], [True, True, True])
+check = CheckButtons(ax_checkbox, ["Edges", "Edge Labels", "Node Labels"], [edge_visibility, edge_labels_visibility, node_labels_visibility])
 ax_checkbox.set_title("Visibility")
 check.on_clicked(toggle_visibility)
 
@@ -185,56 +210,16 @@ btn_down.on_clicked(move_down)
 
 
 # Add cluster navigation button
-def update_cluster():
-    """ Updates the cluster visualization based on the current clusters_step """
-    global normal_edges, all_edges, edge_labels
-    # Read the new cluster file based on clusters_step
-    edge_clusters = parse_clusters(clusters_file(clusters_step))
-
-    # Update edge colors dynamically
-    unique_clusters = sorted(set(edge_clusters.values()))
-    cmap = plt.get_cmap("hsv")
-    colors_map = {cluster: cmap(i / max(1, len(unique_clusters) - 1)) for i, cluster in enumerate(unique_clusters)}
-
-    # Redraw edges with new cluster colors
-    for line_list in all_edges:
-        for line in line_list:
-            line.set_visible(False)  # Hide the previous edges before redrawing
-    for text in edge_labels:
-        text.set_visible(False)
-
-    all_edges = []
-    normal_edges = []
-    edge_labels = []
-    # Draw edges with updated colors
-    for node1, node2 in G.edges():
-        edge_tuple = frozenset({node1, node2})
-        edge = edges[edge_tuple]
-        x1, y1, z1 = pos[node1]
-        x2, y2, z2 = pos[node2]
-        cluster = edge_clusters.get(edge, -1)
-        color = colors_map.get(cluster, "black")
-        alpha = 0.5 if cluster == -1 else 1
-        line_list = ax.plot([x1, x2], [y1, y2], [z1, z2], color=color, alpha=alpha, linewidth=1, linestyle='dotted' if edge[0] == "Measurement" else 'solid')
-        all_edges.append(line_list)
-        if cluster == -1:
-            normal_edges.append(line_list)
-        if edge[0] == "Normal":
-            edge_labels.append(ax.text((x1+x2)/2, (y1+y2)/2, (z1+z2)/2, f"{edge[1]}-{edge[2]}", size=10, zorder=1))
-    plt.draw()
-
-    if not check.get_status()[0]:
-        toggle_visibility("Edges")
-    if not check.get_status()[1]:
-        toggle_visibility("Edge Labels")
-
 def next_cluster(event):
     """ Move to the next cluster and update the graph visualization """
     global clusters_step
-    clusters_step += 1
+    # get max cluster from files in directory
+    clusters_step = min(clusters_step + 1,
+                        len([cluster_file for cluster_file in os.listdir("runs/" + args.run_id)
+                             if cluster_file.startswith("clusters_")]) - 1)
     print(f"Switching to cluster {clusters_step}")
     update_cluster()  # Update the graph visualization with the new cluster
-
+    plt.draw()
 
 def prev_cluster(event):
     """ Move to the previous cluster and update the graph visualization """
@@ -242,6 +227,7 @@ def prev_cluster(event):
     clusters_step = max(0, clusters_step - 1)
     print(f"Switching to cluster {clusters_step}")
     update_cluster()  # Update the graph visualization with the new cluster
+    plt.draw()
 
 ax_next_cluster = plt.axes([0.02, 0.3, 0.2, 0.04])
 btn_next_cluster = Button(ax_next_cluster, 'Next Cluster')
@@ -253,4 +239,3 @@ btn_prev_cluster.on_clicked(prev_cluster)
 
 # Show plot
 plt.show()
-plt.savefig(args.output)

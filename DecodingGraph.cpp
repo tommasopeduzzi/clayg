@@ -278,8 +278,7 @@ void DecodingGraph::dump(const string& filename) {
     ofstream file(filename);
     if (!file) {
         // print out the error
-        cerr << file.rdstate() << endl;
-        cerr << "Error opening file!" << endl;
+        cerr << "Error opening file, while dumping decoding graph!" << endl;
         return;
     }
 
