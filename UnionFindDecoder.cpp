@@ -164,8 +164,6 @@ void UnionFindDecoder::merge(const vector<DecodingGraphEdge::FusionEdge>& fusion
 
 void UnionFindDecoder::dump(const std::string& filename)
 {
-    cout << "Dumping UnionFindDecoder to " << filename << endl;
-
     ofstream file(filename);
     if (!file)
     {

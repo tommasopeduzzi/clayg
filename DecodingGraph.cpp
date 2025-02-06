@@ -274,6 +274,23 @@ void DecodingGraph::reset() {
     }
 }
 
+void DecodingGraph::mark(const std::vector<std::shared_ptr<DecodingGraphEdge>>& error_edges)
+{
+    for (const auto& edge : error_edges)
+    {
+        auto nodes = {edge->nodes().first, edge->nodes().second};
+        for (const auto& node_weak_ptr : nodes)
+        {
+            auto node = node_weak_ptr.lock();
+            if (node->id().type == DecodingGraphNode::VIRTUAL)
+            {
+                continue;
+            }
+            node->set_marked(!node->marked());
+        }
+    }
+}
+
 void DecodingGraph::dump(const string& filename) {
     ofstream file(filename);
     if (!file) {
@@ -292,6 +309,5 @@ void DecodingGraph::dump(const string& filename) {
     }
 
     file.close();
-    cout << "Graph exported to " << filename << endl;
 }
 

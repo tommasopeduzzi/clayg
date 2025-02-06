@@ -1,20 +1,19 @@
 import argparse
 import os
 from math import ceil
+
 import matplotlib
 from matplotlib.widgets import CheckButtons, Button
-from networkx import node_expansion
 
 matplotlib.use("Qt5Agg")  # or "Qt5Agg", "GTK3Agg", "WebAgg" depending on your system
 import matplotlib.pyplot as plt
 import networkx as nx
-import numpy as np
-from mpl_toolkits.mplot3d import Axes3D
-from itertools import cycle
 
 # Parse arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("run_id", help="run id to visualize")
+parser.add_argument("--clusters", help="cluster file to visualize", default="")
+parser.add_argument("--parent_folder", help="parent folder of the runs", default="/runs/")
 parser.add_argument("output", help="output file")
 args = parser.parse_args()
 
@@ -22,11 +21,12 @@ edge_visibility = True
 edge_labels_visibility = False
 node_labels_visibility = False
 
-graph_file = f"runs/{args.run_id}/graph.txt"
-marked_nodes_file = f"runs/{args.run_id}/marked_nodes.txt"
-error_edges_file = f"runs/{args.run_id}/errors.txt"
+graph_file = f"{args.parent_folder}/{args.run_id}/graph.txt"
+marked_nodes_file = f"{args.parent_folder}/{args.run_id}/marked_nodes.txt"
+error_edges_file = f"{args.parent_folder}/{args.run_id}/errors.txt"
 def clusters_file(step):
-    return  f"runs/{args.run_id}/clusters_{step}.txt"
+    assert not args.clusters == ""
+    return f"{args.parent_folder}/{args.run_id}/{args.clusters}/clusters_{step}.txt"
 
 def parse_node(node):
     type, round, id = node.split('-')
@@ -134,14 +134,17 @@ def update_cluster():
 for node1, node2, edge in G.edges().data("edge"):
     x1, y1, z1 = pos[node1]
     x2, y2, z2 = pos[node2]
-    line = ax.plot([x1, x2], [y1, y2], [z1, z2], linewidth=1, linestyle='dotted' if edge[0] == "Measurement" else 'solid')[0]
+    line = ax.plot([x1, x2], [y1, y2], [z1, z2], linewidth=1, alpha=0.5, color="black",
+                   linestyle='dotted' if edge[0] == "Measurement" else 'solid')[0]
     all_edges[edge] = line
     if edge in error_edges:
         # second thick red line
         ax.plot([x1, x2], [y1, y2], [z1, z2], linewidth=2, color="red", zorder=-1)
     if edge[0] == "Normal":
         edge_labels.append(ax.text((x1+x2)/2, (y1+y2)/2, (z1+z2)/2, f"{edge[1]}-{edge[2]}", size=10, zorder=1, visible=edge_labels_visibility))
-update_cluster()
+
+if not args.clusters == "":
+    update_cluster()
 
 # Node Labels
 node_labels = []
@@ -153,7 +156,10 @@ def toggle_visibility(label):
     global edge_visibility, edge_labels_visibility, node_labels_visibility
     if label == "Edges":
         edge_visibility = not edge_visibility
-        edge_clusters = parse_clusters(clusters_file(clusters_step))
+        if args.clusters == "":
+            edge_clusters = {}
+        else:
+            edge_clusters = parse_clusters(clusters_file(clusters_step))
         for edge, line in all_edges.items():
             cluster = edge_clusters.get(edge, -1)
             if cluster == -1 and not edge in error_edges:
@@ -170,7 +176,7 @@ def toggle_visibility(label):
 
 # Create checkboxes
 plt.subplots_adjust(left=0.25)  # Adjust layout for checkbox placement
-ax_checkbox = plt.axes((0.02, 0.5, 0.15, 0.15))  # Position checkbox panel
+ax_checkbox = plt.axes((0.02, 0.5, 0.2, 0.15))  # Position checkbox panel
 check = CheckButtons(ax_checkbox, ["Edges", "Edge Labels", "Node Labels"], [edge_visibility, edge_labels_visibility, node_labels_visibility])
 ax_checkbox.set_title("Visibility")
 check.on_clicked(toggle_visibility)
@@ -192,6 +198,8 @@ def move_down(event):
     ax.view_init(elev=ax.elev - 10, azim=ax.azim)
     plt.draw()
 
+
+# navigation panel
 ax_left = plt.axes([0.02, 0.4, 0.1, 0.04])
 btn_left = Button(ax_left, 'Left')
 btn_left.on_clicked(move_left)
@@ -229,13 +237,15 @@ def prev_cluster(event):
     update_cluster()  # Update the graph visualization with the new cluster
     plt.draw()
 
-ax_next_cluster = plt.axes([0.02, 0.3, 0.2, 0.04])
-btn_next_cluster = Button(ax_next_cluster, 'Next Cluster')
-btn_next_cluster.on_clicked(next_cluster)
 
-ax_prev_cluster = plt.axes([0.02, 0.25, 0.2, 0.04])
-btn_prev_cluster = Button(ax_prev_cluster, 'Previous Cluster')
-btn_prev_cluster.on_clicked(prev_cluster)
+if not args.clusters == "":
+    ax_next_cluster = plt.axes([0.02, 0.3, 0.2, 0.04])
+    btn_next_cluster = Button(ax_next_cluster, 'Next Cluster')
+    btn_next_cluster.on_clicked(next_cluster)
+
+    ax_prev_cluster = plt.axes([0.02, 0.25, 0.2, 0.04])
+    btn_prev_cluster = Button(ax_prev_cluster, 'Previous Cluster')
+    btn_prev_cluster.on_clicked(prev_cluster)
 
 # Show plot
 plt.show()
