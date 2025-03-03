@@ -15,6 +15,11 @@ class ClAYGDecoder final : UnionFindDecoder, public virtual Decoder {
 public:
     ClAYGDecoder() = default;
 
+    std::string decoder() override
+    {
+        return "clayg";
+    }
+
     std::vector<std::shared_ptr<DecodingGraphEdge>> decode(std::shared_ptr<DecodingGraph> graph, bool dump = false, std::string run_id = "") override;
 
     std::vector<std::shared_ptr<DecodingGraphEdge>> clean(const std::shared_ptr<DecodingGraph>& decoding_graph);

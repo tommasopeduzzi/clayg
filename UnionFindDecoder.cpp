@@ -13,11 +13,6 @@ using namespace std;
 vector<shared_ptr<DecodingGraphEdge>> UnionFindDecoder::decode(const shared_ptr<DecodingGraph> graph, bool dump,
                                                                string run_id)
 {
-    if (dump)
-    {
-        graph->dump("runs/" + run_id + "/graph.txt");
-    }
-
     // Initialize clusters
     m_clusters = {};
     for (const auto& node : graph->nodes())
@@ -46,7 +41,7 @@ vector<shared_ptr<DecodingGraphEdge>> UnionFindDecoder::decode(const shared_ptr<
             }
         }
         if (dump)
-            this->dump("runs/" + run_id + "/clusters_" + to_string(growth_steps) + ".txt");
+            this->dump("data/comparisons/current_clusters_uf_" + to_string(growth_steps) + ".txt");
         growth_steps++;
         merge(fusion_edges);
     }

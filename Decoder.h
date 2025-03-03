@@ -13,6 +13,11 @@ class Decoder {
 public:
     virtual ~Decoder() = default;
 
+    virtual std::string decoder()
+    {
+        return "none";
+    }
+
     virtual std::vector<std::shared_ptr<DecodingGraphEdge>> decode(std::shared_ptr<DecodingGraph> graph, bool dump = false, std::string run_id = "") {
         return {};
     };

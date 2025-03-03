@@ -31,11 +31,6 @@ vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(shared_ptr<DecodingGr
     const int rounds = graph->t();
     const auto flattened_graph = DecodingGraph::rotated_surface_code(graph->d(), 1);
 
-    if (dump)
-    {
-        graph->dump("runs/" + run_id + "/graph.txt");
-    }
-
     vector<shared_ptr<DecodingGraphEdge>> error_edges;
 
     m_clusters = {};
@@ -55,8 +50,6 @@ vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(shared_ptr<DecodingGr
             add(flattened_graph, node);
         }
         auto new_error_edges = clean(flattened_graph);
-        if (dump)
-            this->dump("runs/" + run_id + "/clusters_" + to_string(round * 2) + ".txt");
         error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
         for (int _ = 0; _ < g; _++)
         {
@@ -72,7 +65,7 @@ vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(shared_ptr<DecodingGr
             }
             if (dump)
             {
-                this->dump("runs/" + run_id + "/clusters_" + to_string(round * 2 + 1) + ".txt");
+                this->dump("data/comparisons/current_clusters_clayg_" + to_string(round*g+_) + ".txt");
             }
             merge(fusion_edges);
         }

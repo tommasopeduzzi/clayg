@@ -1,7 +1,9 @@
 #include <iostream>
 #include <algorithm>
+#include <filesystem>
 #include <fstream>
 #include <random>
+#include <regex>
 #include <unordered_map>
 
 #include "DecodingGraph.h"
@@ -113,6 +115,7 @@ int compare(int D, int T, double p_start, double p_end, double p_step, bool dump
     random_device rd;
     mt19937 gen(rd());
     uniform_real_distribution<> dis(0.0, 1.0);
+    std::regex cluster_filename_pattern("current_clusters_(uf|clayg)_(\\d+)\\.txt");
 
     double p = p_start;
     while (p <= p_end)
@@ -136,19 +139,25 @@ int compare(int D, int T, double p_start, double p_end, double p_step, bool dump
             }
 
             map<shared_ptr<Decoder>, int> logicals;
+            map<shared_ptr<Decoder>, vector<DecodingGraphEdge::Id>> decoder_corrections;
 
             for (auto& decoder : decoders)
             {
                 graph->reset();
                 graph->mark(error_edges);
 
-                auto corrections = decoder->decode(graph, false, "");
+                auto corrections = decoder->decode(graph, dump, "");
 
                 int logical = 0;
                 logical = compute_logical(logical, logical_edge_ids, error_edges);
                 logical = compute_logical(logical, logical_edge_ids, corrections);
 
                 logicals[decoder] = logical;
+                decoder_corrections[decoder] = {};
+                for (auto& edge : corrections)
+                {
+                    decoder_corrections[decoder].push_back(edge->id());
+                }
                 errors[decoder] += logical;
             }
             for (auto& [decoder, logical] : logicals)
@@ -160,20 +169,74 @@ int compare(int D, int T, double p_start, double p_end, double p_step, bool dump
                         break;
                     }
 
+                    if (error_edge_ids.size() > 4)
+                    {
+                        break;
+                    }
+
                     // make directory in runs
-                    system(("mkdir -p data/comparisons/" + to_string(i)).c_str());
+                    string directory_path = "data/comparisons/" + to_string(i);
+                    filesystem::create_directories(directory_path);
 
-                    graph->dump("data/comparisons/" + to_string(i) + "/graph.txt");
+                    graph->dump(directory_path + "/graph.txt");
 
-                    ofstream file("data/comparisons/" + to_string(i) + "/errors.txt");
+                    ofstream file(directory_path + "/errors.txt");
                     for (const auto& [type, round, id] : error_edge_ids)
                     {
                         file << type << "-" << round << "-" << id << endl;
                     }
                     file.close();
 
+                    for (auto& [decoder, corrections] : decoder_corrections)
+                    {
+                        filesystem::create_directories(directory_path + "/" + decoder->decoder());
+                        ofstream corrections_file(directory_path + "/" + decoder->decoder() + "/corrections.txt");
+                        for (const auto& [type, round, id] : corrections)
+                        {
+                            corrections_file << type << "-" << round << "-" << id << endl;
+                        }
+                        corrections_file.close();
+                    }
+
+                    for (const auto& entry : filesystem::directory_iterator("data/comparisons")) {
+                        if (entry.is_regular_file()) {
+                            std::string filename = entry.path().filename().string();
+                            std::smatch match;
+
+                            // Match filename using regex pattern
+                            if (!std::regex_match(filename, match, cluster_filename_pattern)) {
+                                continue;
+                            }
+
+                            std::string current_decoder = match[1].str();
+                            std::string number = match[2].str();
+                            std::string new_filename = "cluster_" + number + ".txt";
+
+                            // Create target directory: data/comparisons/<i>/<decoder>
+                            std::string target_dir = "data/comparisons/" + std::to_string(i) + "/" + current_decoder;
+                            filesystem::create_directories(target_dir);
+
+                            // Copy file to target path with the new filename
+                            filesystem::path target_path = filesystem::path(target_dir) / new_filename;
+                            copy_file(entry.path(), target_path, filesystem::copy_options::overwrite_existing);
+
+                            // Remove the original file
+                            filesystem::remove(entry.path());
+                        }
+                    }
                     break;
                 }
+            }
+            for (const auto& entry : filesystem::directory_iterator("data/comparisons"))
+            {
+                std::string filename = entry.path().filename().string();
+
+                // Match filename using regex pattern
+                if (std::smatch match; !std::regex_match(filename, match, cluster_filename_pattern)) {
+                    continue;
+                }
+                filesystem::path file_path = filesystem::path("data/comparisons") / filename;
+                filesystem::remove(file_path);
             }
         }
 
@@ -257,6 +320,13 @@ int main(int argc, char* argv[])
             graph->reset();
 
             error_edge_ids = generate_errors(D, T, p, dis, gen);
+            error_edge_ids = {
+                DecodingGraphEdge::Id{DecodingGraphEdge::MEASUREMENT, 2, 2},
+                DecodingGraphEdge::Id{DecodingGraphEdge::NORMAL, 3, 18},
+                DecodingGraphEdge::Id{DecodingGraphEdge::MEASUREMENT, 3, 18},
+                DecodingGraphEdge::Id{DecodingGraphEdge::NORMAL, 5, 19},
+            };
+
 
             // dump errors
             if (current_dump)
