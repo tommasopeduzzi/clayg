@@ -520,9 +520,14 @@ class GraphVisualizer3D:
             self.selected_layer = 0
         self.schedule_draw()
 
-    def reset_view(self):
+    def top_view(self):
         """Reset the camera view to a top-down perspective."""
         self.ax.view_init(elev=90, azim=-90)
+        self.fig.canvas.draw_idle()
+
+    def side_view(self):
+        """Reset the camera view to a top-down perspective."""
+        self.ax.view_init(elev=0, azim=0)
         self.fig.canvas.draw_idle()
 
 
@@ -587,12 +592,16 @@ def main():
     ax_plus = plt.axes([0.12, 0.25, 0.09, 0.04])
     btn_plus = Button(ax_plus, "+")
     # Create Reset View button (always visible)
-    ax_reset = plt.axes([0.01, 0.20, 0.2, 0.04])
-    btn_reset = Button(ax_reset, "Reset View")
+    ax_top = plt.axes([0.01, 0.20, 0.2, 0.04])
+    btn_top = Button(ax_top, "Top View")
+    # Create Reset View button (always visible)
+    ax_side = plt.axes([0.01, 0.15, 0.2, 0.04])
+    btn_side = Button(ax_side, "Side View")
     ax_layer_label.set_visible(True)
     ax_minus.set_visible(True)
     ax_plus.set_visible(True)
-    ax_reset.set_visible(True)
+    ax_top.set_visible(True)
+    ax_side.set_visible(True)
 
     def on_minus(event):
         if visualizer.selected_layer > 0:
@@ -608,12 +617,16 @@ def main():
             visualizer.schedule_draw()
             plt.draw()
 
-    def on_reset(event):
-        visualizer.reset_view()
+    def on_top(event):
+        visualizer.top_view()
+
+    def on_side(event):
+        visualizer.side_view()
 
     btn_minus.on_clicked(on_minus)
     btn_plus.on_clicked(on_plus)
-    btn_reset.on_clicked(on_reset)
+    btn_top.on_clicked(on_top)
+    btn_side.on_clicked(on_side)
 
     plt.show()
 
