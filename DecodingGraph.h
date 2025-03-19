@@ -96,18 +96,21 @@ public:
 private:
     Id m_id;
     std::pair<std::weak_ptr<DecodingGraphNode>, std::weak_ptr<DecodingGraphNode>> m_nodes;
-    float m_growth;
+    float m_growth, m_weight;
 
 public:
     explicit DecodingGraphEdge(const Id id,
-                               std::pair<std::weak_ptr<DecodingGraphNode>, std::weak_ptr<DecodingGraphNode>> nodes = {})
-        : m_id(id), m_nodes(std::move(nodes)), m_growth(0)
+                               std::pair<std::weak_ptr<DecodingGraphNode>, std::weak_ptr<DecodingGraphNode>> nodes = {},
+                               float growth = 0, float weight = 1)
+        : m_id(id), m_nodes(std::move(nodes)), m_growth(growth), m_weight(weight)
     {
     };
 
     [[nodiscard]] Id id() const { return m_id; }
 
     [[nodiscard]] Type type() const { return m_id.type; }
+
+    [[nodiscard]] float weight() const { return m_weight; }
 
     std::pair<std::weak_ptr<DecodingGraphNode>, std::weak_ptr<DecodingGraphNode>> nodes() { return m_nodes; }
 

@@ -19,19 +19,12 @@ shared_ptr<DecodingGraph> DecodingGraph::surface_code(int D, int T) {
     graph->D = D;
     graph->T = T;
 
-    vector<shared_ptr<DecodingGraphNode>> top_boundary_nodes{};
-    vector<shared_ptr<DecodingGraphNode>> bottom_boundary_nodes{};
-
-    for (int i = 0; i < ancilla_width; i++) {
-        auto top_node = make_shared<DecodingGraphNode>(
-                DecodingGraphNode::Id{DecodingGraphNode::Type::VIRTUAL, 0, i});
-        auto bottom_node = make_shared<DecodingGraphNode>(
-                DecodingGraphNode::Id{DecodingGraphNode::Type::VIRTUAL, 0, i + D - 2});
-        graph->addNode(top_node);
-        graph->addNode(bottom_node);
-        top_boundary_nodes.push_back(top_node);
-        bottom_boundary_nodes.push_back(bottom_node);
-    }
+    const shared_ptr<DecodingGraphNode> top_boundary_node = make_shared<DecodingGraphNode>(
+        DecodingGraphNode::Id{DecodingGraphNode::Type::VIRTUAL, 0, 0});
+    const shared_ptr<DecodingGraphNode> bottom_boundary_node = make_shared<DecodingGraphNode>(
+        DecodingGraphNode::Id{DecodingGraphNode::Type::VIRTUAL, 0, 1});
+    graph->addNode(top_boundary_node);
+    graph->addNode(bottom_boundary_node);
 
     for (int t = 0; t < T; t++) {
         DecodingGraphEdge::Id current_edge_id = {DecodingGraphEdge::NORMAL, t, 0};
@@ -50,7 +43,7 @@ shared_ptr<DecodingGraph> DecodingGraph::surface_code(int D, int T) {
                 }
 
                 if (y == 0) {
-                    auto nodes = make_pair(node, top_boundary_nodes[x]);
+                    auto nodes = make_pair(node, top_boundary_node);
                     graph->addEdge(make_shared<DecodingGraphEdge>(
                             current_edge_id, nodes));
                     current_edge_id++;
@@ -76,7 +69,7 @@ shared_ptr<DecodingGraph> DecodingGraph::surface_code(int D, int T) {
                 }
 
                 if (y == ancilla_height - 1) {
-                    auto nodes = make_pair(node, bottom_boundary_nodes[x]);
+                    auto nodes = make_pair(node, bottom_boundary_node);
                     graph->addEdge(make_shared<DecodingGraphEdge>(
                             current_edge_id, nodes));
                     current_edge_id++;
@@ -98,19 +91,12 @@ shared_ptr<DecodingGraph> DecodingGraph::rotated_surface_code(int D, int T) {
     graph->D = D;
     graph->T = T;
 
-    vector<shared_ptr<DecodingGraphNode>> top_boundary_nodes{};
-    vector<shared_ptr<DecodingGraphNode>> bottom_boundary_nodes{};
-
-    for (int i = 0; i < ancilla_width; i++) {
-        auto top_node = make_shared<DecodingGraphNode>(
-                DecodingGraphNode::Id{DecodingGraphNode::Type::VIRTUAL, 0, i});
-        auto bottom_node = make_shared<DecodingGraphNode>(
-                DecodingGraphNode::Id{DecodingGraphNode::Type::VIRTUAL, 0, i + ancilla_width});
-        graph->addNode(top_node);
-        graph->addNode(bottom_node);
-        top_boundary_nodes.push_back(top_node);
-        bottom_boundary_nodes.push_back(bottom_node);
-    }
+    const shared_ptr<DecodingGraphNode> top_boundary_node = make_shared<DecodingGraphNode>(
+        DecodingGraphNode::Id{DecodingGraphNode::Type::VIRTUAL, 0, 0});
+    const shared_ptr<DecodingGraphNode> bottom_boundary_node = make_shared<DecodingGraphNode>(
+        DecodingGraphNode::Id{DecodingGraphNode::Type::VIRTUAL, 0, 1});
+    graph->addNode(top_boundary_node);
+    graph->addNode(bottom_boundary_node);
 
     for (int t = 0; t < T; t++) {
         pair<shared_ptr<DecodingGraphNode>, shared_ptr<DecodingGraphNode>> nodes{};
@@ -131,11 +117,11 @@ shared_ptr<DecodingGraph> DecodingGraph::rotated_surface_code(int D, int T) {
 
                 // Connect to top boundary
                 if (y == 0) {
-                    nodes = make_pair(node, top_boundary_nodes[x]);
+                    nodes = make_pair(node, top_boundary_node);
                     graph->addEdge(make_shared<DecodingGraphEdge>(current_edge_id, nodes));
                     current_edge_id++;
                     if (x + 1 < ancilla_width) {
-                        nodes = make_pair(node, top_boundary_nodes[x + 1]);
+                        nodes = make_pair(node, top_boundary_node);
                         graph->addEdge(make_shared<DecodingGraphEdge>(current_edge_id, nodes));
                         current_edge_id++;
                     }
@@ -182,11 +168,11 @@ shared_ptr<DecodingGraph> DecodingGraph::rotated_surface_code(int D, int T) {
             auto node = graph->node(id).value();
             if (x - 1 >= 0) {
                 graph->addEdge(make_shared<DecodingGraphEdge>(current_edge_id,
-                                                                  make_pair(node, bottom_boundary_nodes[x - 1])));
+                                                              make_pair(node, bottom_boundary_node)));
                 current_edge_id++;
             }
             graph->addEdge(make_shared<DecodingGraphEdge>(current_edge_id,
-                                                              make_pair(node, bottom_boundary_nodes[x])));
+                                                          make_pair(node, bottom_boundary_node)));
             current_edge_id++;
 
         }

@@ -34,7 +34,7 @@ vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(shared_ptr<DecodingGr
     vector<shared_ptr<DecodingGraphEdge>> error_edges;
 
     m_clusters = {};
-    int g = 1;
+    int step = 0;
     for (int round = 0; round <= rounds; round++)
     {
         vector<shared_ptr<DecodingGraphNode>> nodes;
@@ -45,12 +45,19 @@ vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(shared_ptr<DecodingGr
                 nodes.push_back(node);
             }
         }
+        int added_nodes = 0;
         for (const auto& node : nodes)
         {
             add(flattened_graph, node);
+            added_nodes++;
         }
         auto new_error_edges = clean(flattened_graph);
+        if (dump)
+        {
+            this->dump("data/comparisons/current_clusters_clayg_" + to_string(step++) + ".txt");
+        }
         error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
+        int g = 1;
         for (int _ = 0; _ < g; _++)
         {
             vector<DecodingGraphEdge::FusionEdge> fusion_edges;
@@ -65,7 +72,7 @@ vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(shared_ptr<DecodingGr
             }
             if (dump)
             {
-                this->dump("data/comparisons/current_clusters_clayg_" + to_string(round*g+_) + ".txt");
+                this->dump("data/comparisons/current_clusters_clayg_" + to_string(step++) + ".txt");
             }
             merge(fusion_edges);
         }

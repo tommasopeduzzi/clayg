@@ -117,6 +117,13 @@ int compare(int D, int T, double p_start, double p_end, double p_step, bool dump
     uniform_real_distribution<> dis(0.0, 1.0);
     std::regex cluster_filename_pattern("current_clusters_(uf|clayg)_(\\d+)\\.txt");
 
+    cout << "p    \t";
+    for (auto decoder : decoders)
+    {
+        cout << decoder->decoder() << "  \t";
+    }
+    cout << endl;
+
     double p = p_start;
     while (p <= p_end)
     {
@@ -198,13 +205,16 @@ int compare(int D, int T, double p_start, double p_end, double p_step, bool dump
                         corrections_file.close();
                     }
 
-                    for (const auto& entry : filesystem::directory_iterator("data/comparisons")) {
-                        if (entry.is_regular_file()) {
+                    for (const auto& entry : filesystem::directory_iterator("data/comparisons"))
+                    {
+                        if (entry.is_regular_file())
+                        {
                             std::string filename = entry.path().filename().string();
                             std::smatch match;
 
                             // Match filename using regex pattern
-                            if (!std::regex_match(filename, match, cluster_filename_pattern)) {
+                            if (!std::regex_match(filename, match, cluster_filename_pattern))
+                            {
                                 continue;
                             }
 
@@ -232,7 +242,8 @@ int compare(int D, int T, double p_start, double p_end, double p_step, bool dump
                 std::string filename = entry.path().filename().string();
 
                 // Match filename using regex pattern
-                if (std::smatch match; !std::regex_match(filename, match, cluster_filename_pattern)) {
+                if (std::smatch match; !std::regex_match(filename, match, cluster_filename_pattern))
+                {
                     continue;
                 }
                 filesystem::path file_path = filesystem::path("data/comparisons") / filename;
@@ -320,12 +331,11 @@ int main(int argc, char* argv[])
             graph->reset();
 
             error_edge_ids = generate_errors(D, T, p, dis, gen);
-            error_edge_ids = {
-                DecodingGraphEdge::Id{DecodingGraphEdge::MEASUREMENT, 2, 2},
-                DecodingGraphEdge::Id{DecodingGraphEdge::NORMAL, 3, 18},
-                DecodingGraphEdge::Id{DecodingGraphEdge::MEASUREMENT, 3, 18},
-                DecodingGraphEdge::Id{DecodingGraphEdge::NORMAL, 5, 19},
-            };
+            /*error_edge_ids = {
+                DecodingGraphEdge::Id {DecodingGraphEdge::MEASUREMENT, 5, 6},
+                DecodingGraphEdge::Id {DecodingGraphEdge::MEASUREMENT, 5, 14},
+                DecodingGraphEdge::Id {DecodingGraphEdge::NORMAL, 6, 10},
+            };*/
 
 
             // dump errors
@@ -357,6 +367,11 @@ int main(int argc, char* argv[])
             logical = compute_logical(logical, logical_edge_ids, corrections);
             errors += logical;
             run_id += logical;
+
+            if (error_edges.size() < D / 2 && logical)
+            {
+                cout << "Error edges: ";
+            }
         }
 
         double error_rate = static_cast<double>(errors) / 10000;

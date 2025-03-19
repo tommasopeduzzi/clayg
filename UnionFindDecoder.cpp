@@ -64,7 +64,7 @@ vector<DecodingGraphEdge::FusionEdge> UnionFindDecoder::grow(const shared_ptr<Cl
         auto edge = boundary_edge.edge;
         edge->add_growth(0.5);
 
-        if (edge->growth() >= 1)
+        if (edge->growth() >= edge->weight())
         {
             cluster->add_edge(edge);
             fusion_edges.push_back(DecodingGraphEdge::FusionEdge{
