@@ -248,7 +248,7 @@ void compare(int D, int T, double p_start, double p_end, double p_step, const st
                 filesystem::remove(file_path);
             }
 
-            if (i % (10000/(D*D)) < 2)
+            if (i % (10000 / (D * D)) < 2)
             {
                 // delete last line in cout
                 cout << "\r";
