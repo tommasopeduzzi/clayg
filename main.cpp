@@ -15,7 +15,7 @@ using namespace std;
 unordered_map<string, string> parse_args(int argc, char* argv[])
 {
     unordered_map<string, string> args;
-    vector<string> keys = {"D", "T", "p_start", "p_end", "p_step", "dump", "mode"};
+    vector<string> keys = {"D", "T", "p_start", "p_end", "results", "mode", "p_step", "dump"};
     vector<string> modes = {"clayg", "unionfind", "compare", "none"};
 
     for (int i = 1; i < argc; ++i)
@@ -50,7 +50,7 @@ unordered_map<string, string> parse_args(int argc, char* argv[])
     if (args.size() != keys.size())
     {
         cerr << "Error: Invalid number of arguments.\n";
-        cerr << "Usage: " << argv[0] << " D T p_start p_end p_step decoder [dump]\n";
+        cerr << "Usage: " << argv[0] << " D T p_start p_end decoder results mode [p_step] [dump]\n";
         exit(1);
     }
 
@@ -101,7 +101,7 @@ int compute_logical(int logical, const set<int>& logical_edge_ids,
     return logical % 2;
 }
 
-int compare(int D, int T, double p_start, double p_end, double p_step, bool dump)
+void compare(int D, int T, double p_start, double p_end, double p_step, const string& results_file, bool dump)
 {
     auto uf_decoder = make_shared<UnionFindDecoder>();
     auto clayg_decoder = make_shared<ClAYGDecoder>();
@@ -117,12 +117,15 @@ int compare(int D, int T, double p_start, double p_end, double p_step, bool dump
     uniform_real_distribution<> dis(0.0, 1.0);
     std::regex cluster_filename_pattern("current_clusters_(uf|clayg)_(\\d+)\\.txt");
 
-    cout << "p    \t";
-    for (auto decoder : decoders)
+    // open results file
+    cout << "Writing results to " << results_file << endl;
+    ofstream results(results_file, ios::app);
+    results << "p    \t";
+    for (const auto& decoder : decoders)
     {
-        cout << decoder->decoder() << "  \t";
+        results << decoder->decoder() << "  \t";
     }
-    cout << endl;
+    results << endl;
 
     double p = p_start;
     while (p <= p_end)
@@ -172,11 +175,6 @@ int compare(int D, int T, double p_start, double p_end, double p_step, bool dump
                 if (logical != logicals.begin()->second)
                 {
                     if (!dump)
-                    {
-                        break;
-                    }
-
-                    if (error_edge_ids.size() > 4)
                     {
                         break;
                     }
@@ -249,15 +247,25 @@ int compare(int D, int T, double p_start, double p_end, double p_step, bool dump
                 filesystem::path file_path = filesystem::path("data/comparisons") / filename;
                 filesystem::remove(file_path);
             }
+
+            if (i % (10000/(D*D)) < 2)
+            {
+                // delete last line in cout
+                cout << "\r";
+                // print progress
+                cout << "p=" << p << ": " << i + 1 << " / 10000";
+            }
         }
 
-        cout << p << "\t";
+        // open the file
+        ofstream file(results_file, ios::app);
+        file << p << "\t";
         for (auto& [decoder, error] : errors)
         {
             double error_rate = static_cast<double>(error) / 10000;
-            cout << error_rate << "\t";
+            file << error_rate << "\t";
         }
-        cout << endl;
+        file << endl;
 
         p += p_step;
     }
@@ -273,12 +281,15 @@ int main(int argc, char* argv[])
     double p_start = stod(args["p_start"]);
     double p_end = stod(args["p_end"]);
     double p_step = stod(args["p_step"]);
+    string results_file = args["results"];
     bool dump = string(args["dump"]) == "true";
     string mode = args["mode"];
 
     if (mode == "compare")
     {
-        return compare(D, T, p_start, p_end, p_step, dump);
+        cout << results_file << endl;
+        compare(D, T, p_start, p_end, p_step, results_file, dump);
+        return 0;
     }
 
     unique_ptr<Decoder> decoder = {};
@@ -317,10 +328,7 @@ int main(int argc, char* argv[])
 
         for (int i = 0; i < 10000; i++)
         {
-            // only bother to dump when there are actually errors.
-            bool current_dump = !error_edge_ids.empty() && dump;
-
-            if (current_dump)
+            if (dump)
             {
                 // make directory in runs
                 system(("mkdir -p runs/" + to_string(run_id)).c_str());
@@ -339,7 +347,7 @@ int main(int argc, char* argv[])
 
 
             // dump errors
-            if (current_dump)
+            if (dump)
             {
                 ofstream file("runs/" + to_string(run_id) + "/errors.txt");
                 for (const auto& [type, round, id] : error_edge_ids)
@@ -362,20 +370,27 @@ int main(int argc, char* argv[])
             // mark nodes
             graph->mark(error_edges);
 
-            auto corrections = decoder->decode(graph, current_dump, to_string(run_id));
+            auto corrections = decoder->decode(graph, dump, to_string(run_id));
 
             logical = compute_logical(logical, logical_edge_ids, corrections);
             errors += logical;
             run_id += logical;
 
-            if (error_edges.size() < D / 2 && logical)
+            // update last line of cout to show progress
+            if ((i % (10000/(D*D)))< 2)
             {
-                cout << "Error edges: ";
+                // delete last line in cout
+                cout << "\r";
+                // print progress
+                cout << "p=" << p << ": " << i + 1 << " / 10000";
             }
         }
 
+        // open the results file and append the results
+        ofstream file(results_file, ios::app);
         double error_rate = static_cast<double>(errors) / 10000;
-        cout << p << "\t" << error_rate << endl;
+        file << p << "\t" << error_rate << endl;
+
         p += p_step;
     }
 }
