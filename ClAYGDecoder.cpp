@@ -29,9 +29,11 @@ vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(shared_ptr<DecodingGr
     });
 
     const int rounds = graph->t();
-    const auto flattened_graph = DecodingGraph::rotated_surface_code(graph->d(), 1);
+    const auto decoding_graph = DecodingGraph::rotated_surface_code(graph->d(), graph->t());
 
     vector<shared_ptr<DecodingGraphEdge>> error_edges;
+
+    last_growth_steps = 0;
 
     m_clusters = {};
     int step = 0;
@@ -48,10 +50,10 @@ vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(shared_ptr<DecodingGr
         int added_nodes = 0;
         for (const auto& node : nodes)
         {
-            add(flattened_graph, node);
+            add(decoding_graph, node);
             added_nodes++;
         }
-        auto new_error_edges = clean(flattened_graph);
+        auto new_error_edges = clean(decoding_graph);
         if (dump)
         {
             this->dump("data/comparisons/current_clusters_clayg_" + to_string(step++) + ".txt");
@@ -76,12 +78,13 @@ vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(shared_ptr<DecodingGr
             }
             merge(fusion_edges);
         }
-        new_error_edges = clean(flattened_graph);
+        new_error_edges = clean(decoding_graph);
         error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
     }
 
     while (!Cluster::all_clusters_are_neutral(m_clusters))
     {
+        last_growth_steps++;
         vector<DecodingGraphEdge::FusionEdge> fusion_edges;
         for (const auto& cluster : m_clusters)
         {
@@ -95,7 +98,7 @@ vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(shared_ptr<DecodingGr
         merge(fusion_edges);
     }
 
-    auto new_error_edges = clean(flattened_graph);
+    auto new_error_edges = clean(decoding_graph);
     error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
 
     return error_edges;
@@ -105,7 +108,6 @@ void ClAYGDecoder::add(const shared_ptr<DecodingGraph>& graph, shared_ptr<Decodi
 {
     // Find corresponding node in the flattened decoding graph
     auto id = node->id();
-    id.round = 0;
     node = graph->node(id).value();
     node->set_marked(!node->marked());
     if (node->cluster().has_value())
