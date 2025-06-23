@@ -214,6 +214,8 @@ class GraphVisualizer3D:
             sys.exit(1)
 
     def load_corrections(self):
+        if self.corrections_file is None:
+            return
         try:
             with open(self.corrections_file, 'r') as f:
                 for line in f:

@@ -27,9 +27,9 @@ vector<shared_ptr<DecodingGraphEdge>> UnionFindDecoder::decode(const shared_ptr<
     }
 
     // Main Union Find loop
-    int growth_steps = 0;
     while (!Cluster::all_clusters_are_neutral(m_clusters))
     {
+        last_growth_steps++;
         graph->node(DecodingGraphNode::Id{DecodingGraphNode::ANCILLA, 4, 2});
         vector<DecodingGraphEdge::FusionEdge> fusion_edges;
         for (const auto& cluster : m_clusters)
@@ -41,8 +41,7 @@ vector<shared_ptr<DecodingGraphEdge>> UnionFindDecoder::decode(const shared_ptr<
             }
         }
         if (dump)
-            this->dump("data/comparisons/current_clusters_uf_" + to_string(growth_steps) + ".txt");
-        growth_steps++;
+            this->dump("data/comparisons/current_clusters_uf_" + to_string(last_growth_steps) + ".txt");
         merge(fusion_edges);
     }
 

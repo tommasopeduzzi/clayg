@@ -11,6 +11,9 @@
 
 class Decoder {
 public:
+    // FIXME: DO LOGGING DIFFERENTLY!
+    int last_growth_steps = 0;
+
     virtual ~Decoder() = default;
 
     virtual std::string decoder()

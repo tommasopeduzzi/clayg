@@ -170,6 +170,8 @@ void compare(int D, int T, double p_start, double p_end, double p_step, const st
                 }
                 errors[decoder] += logical;
             }
+
+            // FIXME: FIX LOGGING!
             for (auto& [decoder, logical] : logicals)
             {
                 if (logical != logicals.begin()->second)
@@ -281,14 +283,16 @@ int main(int argc, char* argv[])
     double p_start = stod(args["p_start"]);
     double p_end = stod(args["p_end"]);
     double p_step = stod(args["p_step"]);
-    string results_file = args["results"];
+    string results_file_path = args["results"];
     bool dump = string(args["dump"]) == "true";
     string mode = args["mode"];
 
+    string growth_steps_file_path = results_file_path + "_growth_steps.txt";
+
     if (mode == "compare")
     {
-        cout << results_file << endl;
-        compare(D, T, p_start, p_end, p_step, results_file, dump);
+        cout << results_file_path << endl;
+        compare(D, T, p_start, p_end, p_step, results_file_path, dump);
         return 0;
     }
 
@@ -321,12 +325,23 @@ int main(int argc, char* argv[])
 
     int run_id = 0;
 
+    int runs = 100000;
+    string runs_string = to_string(runs);
     double p = p_start;
+
+    // open results file
+    cout << "Writing results to " << results_file_path << endl;
+    ofstream results_file(results_file_path, ios::app);
+    results_file << "p    \t" << decoder->decoder() << "  \t" << endl;
+    cout << "Writing average growth steps to " << growth_steps_file_path << endl;
+    ofstream growth_steps_file(growth_steps_file_path, ios::app);
+    growth_steps_file << "p    \t" << decoder->decoder() << "  \t" << endl;
+
     while (p <= p_end)
     {
         int errors = 0;
-
-        for (int i = 0; i < 10000; i++)
+        int growth_steps = 0;
+        for (int i = 0; i < runs; i++)
         {
             if (dump)
             {
@@ -339,12 +354,6 @@ int main(int argc, char* argv[])
             graph->reset();
 
             error_edge_ids = generate_errors(D, T, p, dis, gen);
-            /*error_edge_ids = {
-                DecodingGraphEdge::Id {DecodingGraphEdge::MEASUREMENT, 5, 6},
-                DecodingGraphEdge::Id {DecodingGraphEdge::MEASUREMENT, 5, 14},
-                DecodingGraphEdge::Id {DecodingGraphEdge::NORMAL, 6, 10},
-            };*/
-
 
             // dump errors
             if (dump)
@@ -377,19 +386,23 @@ int main(int argc, char* argv[])
             run_id += logical;
 
             // update last line of cout to show progress
-            if ((i % (10000 / (D * D))) < 2)
+            if ((i % (runs / (D * D))) < 2)
             {
                 // delete last line in cout
                 cout << "\r";
                 // print progress
-                cout << "p=" << p << ": " << i + 1 << " / 10000";
+                cout << "p=" << p << ": " << i + 1 << " / 100000";
             }
+
+            // Growth steps
+            growth_steps += decoder->last_growth_steps;
         }
 
         // open the results file and append the results
-        ofstream file(results_file, ios::app);
-        double error_rate = static_cast<double>(errors) / 10000;
-        file << p << "\t" << error_rate << endl;
+        double error_rate = static_cast<double>(errors) / runs;
+        results_file << p << "\t" << error_rate << endl;
+        double average_growth_steps = static_cast<double>(growth_steps) / runs;
+        growth_steps_file << p << "\t" << average_growth_steps << endl;
 
         p += p_step;
     }
