@@ -4,10 +4,11 @@
 
 #include <iostream>
 #include "ClAYGDecoder.h"
+#include "Logger.h"
 
 using namespace std;
 
-vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph, bool dump, string run_id)
+vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
 {
     vector<shared_ptr<DecodingGraphNode>> marked_nodes;
 
@@ -33,8 +34,6 @@ vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(shared_ptr<DecodingGr
 
     vector<shared_ptr<DecodingGraphEdge>> error_edges;
 
-    last_growth_steps = 0;
-
     m_clusters = {};
     int step = 0;
     for (int round = 0; round <= rounds; round++)
@@ -54,10 +53,7 @@ vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(shared_ptr<DecodingGr
             added_nodes++;
         }
         auto new_error_edges = clean(decoding_graph);
-        if (dump)
-        {
-            this->dump("data/comparisons/current_clusters_clayg_" + to_string(step++) + ".txt");
-        }
+        logger.log_clusters(m_clusters, "clayg", step++);
         error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
         int g = 1;
         for (int _ = 0; _ < g; _++)
@@ -72,9 +68,9 @@ vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(shared_ptr<DecodingGr
                     fusion_edges.push_back(fusion_edge);
                 }
             }
-            if (dump)
+            if (Logger::instance().is_dump_enabled())
             {
-                this->dump("data/comparisons/current_clusters_clayg_" + to_string(step++) + ".txt");
+                logger.log_clusters(m_clusters, "clayg", step++);
             }
             merge(fusion_edges);
         }
@@ -84,7 +80,7 @@ vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(shared_ptr<DecodingGr
 
     while (!Cluster::all_clusters_are_neutral(m_clusters))
     {
-        last_growth_steps++;
+        logger.increment_growth_steps();
         vector<DecodingGraphEdge::FusionEdge> fusion_edges;
         for (const auto& cluster : m_clusters)
         {

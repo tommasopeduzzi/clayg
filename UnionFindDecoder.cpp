@@ -5,13 +5,13 @@
 #include <algorithm>
 #include <iostream>
 #include "UnionFindDecoder.h"
+#include "Logger.h"
 
 #include <fstream>
 
 using namespace std;
 
-vector<shared_ptr<DecodingGraphEdge>> UnionFindDecoder::decode(const shared_ptr<DecodingGraph> graph, bool dump,
-                                                               string run_id)
+vector<shared_ptr<DecodingGraphEdge>> UnionFindDecoder::decode(const shared_ptr<DecodingGraph> graph)
 {
     // Initialize clusters
     m_clusters = {};
@@ -26,10 +26,12 @@ vector<shared_ptr<DecodingGraphEdge>> UnionFindDecoder::decode(const shared_ptr<
         }
     }
 
+    int steps = 0;
+    logger.set_growth_steps(0);
     // Main Union Find loop
     while (!Cluster::all_clusters_are_neutral(m_clusters))
     {
-        last_growth_steps++;
+        logger.increment_growth_steps();
         graph->node(DecodingGraphNode::Id{DecodingGraphNode::ANCILLA, 4, 2});
         vector<DecodingGraphEdge::FusionEdge> fusion_edges;
         for (const auto& cluster : m_clusters)
@@ -40,8 +42,7 @@ vector<shared_ptr<DecodingGraphEdge>> UnionFindDecoder::decode(const shared_ptr<
                 fusion_edges.push_back(fusion_edge);
             }
         }
-        if (dump)
-            this->dump("data/comparisons/current_clusters_uf_" + to_string(last_growth_steps) + ".txt");
+        logger.log_clusters(m_clusters, "uf", steps++);
         merge(fusion_edges);
     }
 
@@ -153,27 +154,5 @@ void UnionFindDecoder::merge(const vector<DecodingGraphEdge::FusionEdge>& fusion
         auto cluster_to_be_removed = find(m_clusters.begin(), m_clusters.end(), other_cluster);
         if (cluster_to_be_removed != m_clusters.end())
             m_clusters.erase(cluster_to_be_removed);
-    }
-}
-
-void UnionFindDecoder::dump(const std::string& filename)
-{
-    ofstream file(filename);
-    if (!file)
-    {
-        // print out the error
-        cerr << file.rdstate() << endl;
-        cerr << "Error opening file!" << endl;
-        return;
-    }
-
-    int cluster_id = 0;
-    for (auto cluster : m_clusters)
-    {
-        for (auto edge : cluster->edges())
-        {
-            file << edge->id().type << "-" << edge->id().round << "-" << edge->id().id << "," << cluster_id << endl;
-        }
-        cluster_id++;
     }
 }
