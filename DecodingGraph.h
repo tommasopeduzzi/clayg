@@ -177,8 +177,6 @@ public:
     void reset();
 
     void mark(const std::vector<std::shared_ptr<DecodingGraphEdge>>& error_edges);
-
-    void dump(const std::string& filename);
 };
 
 

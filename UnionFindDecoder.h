@@ -25,13 +25,11 @@ public:
         return "uf";
     }
 
-    std::vector<std::shared_ptr<DecodingGraphEdge>> decode(std::shared_ptr<DecodingGraph> graph, bool dump = false, std::string run_id = "") override;
+    std::vector<std::shared_ptr<DecodingGraphEdge>> decode(std::shared_ptr<DecodingGraph> graph) override;
 
     std::vector<DecodingGraphEdge::FusionEdge> grow(const std::shared_ptr<Cluster>& cluster);
 
     void merge(const std::vector<DecodingGraphEdge::FusionEdge>& fusion_edges);
-
-    void dump(const std::string& filename) override;
 };
 
 

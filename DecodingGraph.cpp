@@ -3,6 +3,7 @@
 //
 
 #include "DecodingGraph.h"
+#include "Logger.h"
 
 #include <fstream>
 #include <iostream>
@@ -276,24 +277,3 @@ void DecodingGraph::mark(const std::vector<std::shared_ptr<DecodingGraphEdge>>& 
         }
     }
 }
-
-void DecodingGraph::dump(const string& filename) {
-    ofstream file(filename);
-    if (!file) {
-        // print out the error
-        cerr << "Error opening file, while dumping decoding graph!" << endl;
-        return;
-    }
-
-    for (const auto& edge : m_edges) {
-        auto [node1, node2] = edge->nodes();
-        if (auto n1 = node1.lock(), n2 = node2.lock(); n1 && n2) {
-            file << n1->id().type << "-" << n1->id().round << "-" << n1->id().id << ","
-                 << n2->id().type << "-" << n2->id().round << "-" << n2->id().id << ","
-                 << edge->id().type << "-" << edge->id().round << "-" << edge->id().id << "\n";
-        }
-    }
-
-    file.close();
-}
-

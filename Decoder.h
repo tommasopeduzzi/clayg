@@ -11,9 +11,6 @@
 
 class Decoder {
 public:
-    // FIXME: DO LOGGING DIFFERENTLY!
-    int last_growth_steps = 0;
-
     virtual ~Decoder() = default;
 
     virtual std::string decoder()
@@ -21,7 +18,7 @@ public:
         return "none";
     }
 
-    virtual std::vector<std::shared_ptr<DecodingGraphEdge>> decode(std::shared_ptr<DecodingGraph> graph, bool dump = false, std::string run_id = "") {
+    virtual std::vector<std::shared_ptr<DecodingGraphEdge>> decode(std::shared_ptr<DecodingGraph> graph) {
         return {};
     };
 
