@@ -120,7 +120,8 @@ void Logger::log_corrections(const std::vector<DecodingGraphEdge::Id>& correctio
 }
 
 void Logger::prepare_run_dir() const {
-    std::string run_dir = "runs/" + std::to_string(run_id);
+    if (!dump_enabled) return;
+    std::string run_dir = "data/runs/" + std::to_string(run_id);
     std::filesystem::create_directories(run_dir);
     clear_files_by_pattern(run_dir, "clusters_");
     clear_files_by_pattern(run_dir, "graph.txt");
