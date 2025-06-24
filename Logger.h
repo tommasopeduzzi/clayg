@@ -28,8 +28,8 @@ public:
     void log_corrections(const std::vector<DecodingGraphEdge::Id>& correction_ids, const std::string& decoder) const;
     void log_results(const std::string& line);
     void log_growth_steps(const std::string& line);
-    void log_results_entry(double p, double value);
-    void log_growth_steps_entry(double p, double value);
+    void log_results_entry(double p, double value, const std::string& decoder_name);
+    void log_growth_steps_entry(double p, double value, const std::string& decoder_name);
     void prepare_results_file(const std::string& decoder_name);
     void prepare_growth_steps_file(const std::string& decoder_name);
     void prepare_run_dir() const;
@@ -42,11 +42,6 @@ public:
     void set_run_id(int id);
     int get_run_id() const;
     void increment_run_id(int by = 1);
-
-    // Growth steps management
-    void set_growth_steps(int steps);
-    int get_growth_steps() const;
-    void increment_growth_steps();
 
     // Distance management
     void set_distance(int distance);
@@ -65,7 +60,6 @@ public:
 private:
     bool dump_enabled = false;
     int run_id = 0;
-    int growth_steps = 0;
     std::string results_dir_ = "data/results";
     int distance_ = -1;
 };

@@ -25,6 +25,8 @@ public:
     virtual void dump(const std::string& filename)
     {
     }
+
+    virtual int get_last_growth_steps() const { return 0; }
 };
 
 

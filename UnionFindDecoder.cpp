@@ -27,11 +27,9 @@ vector<shared_ptr<DecodingGraphEdge>> UnionFindDecoder::decode(const shared_ptr<
     }
 
     int steps = 0;
-    logger.set_growth_steps(0);
     // Main Union Find loop
     while (!Cluster::all_clusters_are_neutral(m_clusters))
     {
-        logger.increment_growth_steps();
         graph->node(DecodingGraphNode::Id{DecodingGraphNode::ANCILLA, 4, 2});
         vector<DecodingGraphEdge::FusionEdge> fusion_edges;
         for (const auto& cluster : m_clusters)
@@ -45,7 +43,7 @@ vector<shared_ptr<DecodingGraphEdge>> UnionFindDecoder::decode(const shared_ptr<
         logger.log_clusters(m_clusters, "uf", steps++);
         merge(fusion_edges);
     }
-
+    last_growth_steps_ = steps;
     return PeelingDecoder::decode(m_clusters, graph);
 }
 

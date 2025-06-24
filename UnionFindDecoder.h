@@ -14,6 +14,7 @@ class UnionFindDecoder : public virtual Decoder
 {
 protected:
     std::vector<std::shared_ptr<Cluster>> m_clusters;
+    int last_growth_steps_ = 0;
 
 public:
     UnionFindDecoder()
@@ -30,6 +31,8 @@ public:
     std::vector<DecodingGraphEdge::FusionEdge> grow(const std::shared_ptr<Cluster>& cluster);
 
     void merge(const std::vector<DecodingGraphEdge::FusionEdge>& fusion_edges);
+
+    int get_last_growth_steps() const override { return last_growth_steps_; }
 };
 
 

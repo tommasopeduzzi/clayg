@@ -141,9 +141,9 @@ void Logger::prepare_results_file(const std::string& decoder_name) {
     std::filesystem::create_directories(results_dir_);
     std::string filename;
     if (distance_ > 0) {
-        filename = results_dir_ + "/results_d=" + std::to_string(distance_) + ".txt";
+        filename = results_dir_ + "/results_" + decoder_name + "_d=" + std::to_string(distance_) + ".txt";
     } else {
-        filename = results_dir_ + "/results.txt";
+        filename = results_dir_ + "/results_" + decoder_name + ".txt";
     }
     std::cout << "Writing results to " << filename << std::endl;
     write_to_file(filename, "p    \t" + decoder_name + "  \t\n", true);
@@ -153,9 +153,9 @@ void Logger::prepare_growth_steps_file(const std::string& decoder_name) {
     std::filesystem::create_directories(results_dir_);
     std::string filename;
     if (distance_ > 0) {
-        filename = results_dir_ + "/average_operations_d=" + std::to_string(distance_) + ".txt";
+        filename = results_dir_ + "/average_operations_" + decoder_name + "_d=" + std::to_string(distance_) + ".txt";
     } else {
-        filename = results_dir_ + "/average_operations.txt";
+        filename = results_dir_ + "/average_operations_" + decoder_name + ".txt";
     }
     std::cout << "Writing average growth steps to " << filename << std::endl;
     write_to_file(filename, "p    \t" + decoder_name + "  \t\n", true);
@@ -183,28 +183,30 @@ void Logger::log_growth_steps(const std::string& line) {
     write_to_file(filename, line, true);
 }
 
-void Logger::log_results_entry(double p, double value) {
-    char buf[64];
-    snprintf(buf, sizeof(buf), "%g\t%.10g\n", p, value);
-    log_results(std::string(buf));
+void Logger::log_results_entry(double p, double value, const std::string& decoder_name) {
+    std::filesystem::create_directories(results_dir_);
+    std::string filename;
+    if (distance_ > 0) {
+        filename = results_dir_ + "/results_" + decoder_name + "_d=" + std::to_string(distance_) + ".txt";
+    } else {
+        filename = results_dir_ + "/results_" + decoder_name + ".txt";
+    }
+    std::ostringstream line;
+    line << p << "\t" << value << "\n";
+    write_to_file(filename, line.str(), true);
 }
 
-void Logger::log_growth_steps_entry(double p, double value) {
-    char buf[64];
-    snprintf(buf, sizeof(buf), "%g\t%.10g\n", p, value);
-    log_growth_steps(std::string(buf));
-}
-
-void Logger::set_growth_steps(int steps) {
-    growth_steps = steps;
-}
-
-int Logger::get_growth_steps() const {
-    return growth_steps;
-}
-
-void Logger::increment_growth_steps() {
-    growth_steps++;
+void Logger::log_growth_steps_entry(double p, double value, const std::string& decoder_name) {
+    std::filesystem::create_directories(results_dir_);
+    std::string filename;
+    if (distance_ > 0) {
+        filename = results_dir_ + "/average_operations_" + decoder_name + "_d=" + std::to_string(distance_) + ".txt";
+    } else {
+        filename = results_dir_ + "/average_operations_" + decoder_name + ".txt";
+    }
+    std::ostringstream line;
+    line << p << "\t" << value << "\n";
+    write_to_file(filename, line.str(), true);
 }
 
 void Logger::log_progress(int current, int total, double p, int D, int interval_ms) {

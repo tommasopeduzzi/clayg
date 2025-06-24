@@ -25,6 +25,11 @@ public:
     std::vector<std::shared_ptr<DecodingGraphEdge>> clean(const std::shared_ptr<DecodingGraph>& decoding_graph);
 
     void add(const std::shared_ptr<DecodingGraph>& graph, std::shared_ptr<DecodingGraphNode> node);
+
+    int get_last_growth_steps() const override { return last_growth_steps_; }
+
+private:
+    int last_growth_steps_ = 0;
 };
 
 
