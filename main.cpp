@@ -47,6 +47,13 @@ unordered_map<string, string> parse_args(int argc, char* argv[])
         exit(1);
     }
 
+    if (args["p_step"][0] != '*' && args["p_step"][0] != '+')
+    {
+        cerr << "Error: Invalid p_step.\n";
+        cerr << "Usage: p_step=*{factor} or p_step=+{step}\n";
+        exit(1);
+    }
+
     return args;
 }
 
@@ -103,7 +110,7 @@ int main(int argc, char* argv[])
     int T = stoi(args["T"]);
     double p_start = stod(args["p_start"]);
     double p_end = stod(args["p_end"]);
-    double p_step = stod(args["p_step"]);
+    pair<char, double> p_step = {args["p_step"][0], stod(args["p_step"].substr(1))};
     string results_file_path = args["results"];
     bool dump = string(args["dump"]) == "true";
     logger.set_dump_enabled(dump);
@@ -207,7 +214,16 @@ int main(int argc, char* argv[])
             double avg_growth = growth_steps[decoder->decoder()] / runs;
             logger.log_growth_steps_entry(p, avg_growth, decoder->decoder());
         }
-        p += p_step;
+        switch (p_step.first)
+        {
+        case '+':
+            p += p_step.second;
+            break;
+        case '*':
+        default:
+            p *= p_step.second;
+            break;
+        }
     }
     return 0;
 }
