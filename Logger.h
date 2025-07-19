@@ -26,12 +26,10 @@ public:
     void log_graph(const std::vector<std::shared_ptr<DecodingGraphEdge>>& edges) const;
     void log_errors(const std::vector<DecodingGraphEdge::Id>& error_ids) const;
     void log_corrections(const std::vector<DecodingGraphEdge::Id>& correction_ids, const std::string& decoder) const;
-    void log_results(const std::string& line);
-    void log_growth_steps(const std::string& line);
     void log_results_entry(double p, double value, const std::string& decoder_name);
-    void log_growth_steps_entry(double p, double value, const std::string& decoder_name);
+    void log_growth_steps(double p, const std::map<int, int>& frequencies, const std::string& decoder_name);
     void prepare_results_file(const std::string& decoder_name);
-    void prepare_growth_steps_file(const std::string& decoder_name);
+    void prepare_steps_file(const std::string& decoder_name);
     void prepare_run_dir() const;
 
     // Dump flag management
@@ -65,3 +63,4 @@ private:
 };
 
 extern Logger logger;
+

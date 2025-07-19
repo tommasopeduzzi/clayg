@@ -194,17 +194,18 @@ int main(int argc, char* argv[])
 
     // Prepare results and growth steps files for each decoder
     for (const auto& decoder : decoders) {
-        logger.prepare_results_file(decoder->decoder());
-        logger.prepare_growth_steps_file(decoder->decoder());
+        logger.prepare_results_file(decoder->decoder_name());
+        logger.prepare_steps_file(decoder->decoder_name());
     }
+
 
     while (p <= p_end)
     {
         map<string, int> errors;
-        map<string, double> growth_steps;
+        map<string, map<int, int>> growth_steps;
         for (const auto& decoder : decoders) {
-            errors[decoder->decoder()] = 0;
-            growth_steps[decoder->decoder()] = 0.0;
+            errors[decoder->decoder_name()] = 0;
+            growth_steps[decoder->decoder_name()] = {};
         }
 
         for (int i = 0; i < runs; i++)
@@ -230,10 +231,10 @@ int main(int argc, char* argv[])
                 for (auto& edge : corrections) {
                     correction_ids.push_back(edge->id());
                 }
-                logger.log_corrections(correction_ids, decoder->decoder());
+                logger.log_corrections(correction_ids, decoder->decoder_name());
                 int logical_result = compute_logical(logical, logical_edge_ids, corrections);
-                errors[decoder->decoder()] += logical_result;
-                growth_steps[decoder->decoder()] += decoder->get_last_growth_steps();
+                errors[decoder->decoder_name()] += logical_result;
+                growth_steps[decoder->decoder_name()][decoder->get_last_growth_steps()] += 1;;
                 if (logical_result != logical) {
                     uncorrected = true;
                 }
@@ -246,10 +247,9 @@ int main(int argc, char* argv[])
         }
         // Log results and average growth steps for each decoder
         for (const auto& decoder : decoders) {
-            double error_rate = static_cast<double>(errors[decoder->decoder()]) / runs;
-            logger.log_results_entry(p, error_rate, decoder->decoder());
-            double avg_growth = growth_steps[decoder->decoder()] / runs;
-            logger.log_growth_steps_entry(p, avg_growth, decoder->decoder());
+            double error_rate = static_cast<double>(errors[decoder->decoder_name()]) / runs;
+            logger.log_results_entry(p, error_rate, decoder->decoder_name());
+            logger.log_growth_steps(p, growth_steps[decoder->decoder_name()], decoder->decoder_name());
         }
         switch (p_step.first)
         {

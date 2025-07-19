@@ -119,10 +119,32 @@ void Logger::log_corrections(const std::vector<DecodingGraphEdge::Id>& correctio
     write_to_file(filename, content.str(), false);
 }
 
+void Logger::prepare_results_file(const std::string& decoder_name) {
+    std::filesystem::create_directories(results_dir_ + "/steps");
+    std::string filename;
+    if (distance_ > 0) {
+        filename = results_dir_ + "/results/" + decoder_name + "_d=" + std::to_string(distance_) + ".txt";
+    } else {
+        filename = results_dir_ + "/results/" + decoder_name + ".txt";
+    }
+}
+
+void Logger::prepare_steps_file(const std::string& decoder_name) {
+    std::filesystem::create_directories(results_dir_ + "/results");
+    std::string filename;
+    if (distance_ > 0) {
+        filename = results_dir_ + "/average_operations_" + decoder_name + "_d=" + std::to_string(distance_) + ".txt";
+    } else {
+        filename = results_dir_ + "/average_operations_" + decoder_name + ".txt";
+    }
+}
+
+
 void Logger::prepare_run_dir() const {
     if (!dump_enabled) return;
     std::string run_dir = "data/runs/" + std::to_string(run_id);
     std::filesystem::create_directories(run_dir);
+    // Create steps and results subdirectories at the beginning
     clear_files_by_pattern(run_dir, "clusters_");
     clear_files_by_pattern(run_dir, "graph.txt");
     clear_files_by_pattern(run_dir, "errors.txt");
@@ -137,76 +159,33 @@ int Logger::get_distance() const {
     return distance_;
 }
 
-void Logger::prepare_results_file(const std::string& decoder_name) {
-    std::filesystem::create_directories(results_dir_);
-    std::string filename;
-    if (distance_ > 0) {
-        filename = results_dir_ + "/results_" + decoder_name + "_d=" + std::to_string(distance_) + ".txt";
-    } else {
-        filename = results_dir_ + "/results_" + decoder_name + ".txt";
-    }
-    std::cout << "Writing results to " << filename << std::endl;
-    write_to_file(filename, "p    \t" + decoder_name + "  \t\n", true);
-}
-
-void Logger::prepare_growth_steps_file(const std::string& decoder_name) {
-    std::filesystem::create_directories(results_dir_);
-    std::string filename;
-    if (distance_ > 0) {
-        filename = results_dir_ + "/average_operations_" + decoder_name + "_d=" + std::to_string(distance_) + ".txt";
-    } else {
-        filename = results_dir_ + "/average_operations_" + decoder_name + ".txt";
-    }
-    std::cout << "Writing average growth steps to " << filename << std::endl;
-    write_to_file(filename, "p    \t" + decoder_name + "  \t\n", true);
-}
-
-void Logger::log_results(const std::string& line) {
-    std::filesystem::create_directories(results_dir_);
-    std::string filename;
-    if (distance_ > 0) {
-        filename = results_dir_ + "/results_d=" + std::to_string(distance_) + ".txt";
-    } else {
-        filename = results_dir_ + "/results.txt";
-    }
-    write_to_file(filename, line, true);
-}
-
-void Logger::log_growth_steps(const std::string& line) {
-    std::filesystem::create_directories(results_dir_);
-    std::string filename;
-    if (distance_ > 0) {
-        filename = results_dir_ + "/average_operations_d=" + std::to_string(distance_) + ".txt";
-    } else {
-        filename = results_dir_ + "/average_operations.txt";
-    }
-    write_to_file(filename, line, true);
-}
-
 void Logger::log_results_entry(double p, double value, const std::string& decoder_name) {
     std::filesystem::create_directories(results_dir_);
     std::string filename;
     if (distance_ > 0) {
-        filename = results_dir_ + "/results_" + decoder_name + "_d=" + std::to_string(distance_) + ".txt";
+        filename = results_dir_ + "/results/" + decoder_name + "_d=" + std::to_string(distance_) + ".txt";
     } else {
-        filename = results_dir_ + "/results_" + decoder_name + ".txt";
+        filename = results_dir_ + "/results/" + decoder_name + ".txt";
     }
     std::ostringstream line;
     line << p << "\t" << value << "\n";
     write_to_file(filename, line.str(), true);
 }
 
-void Logger::log_growth_steps_entry(double p, double value, const std::string& decoder_name) {
+void Logger::log_growth_steps(double p, const std::map<int, int>& frequencies, const std::string& decoder_name) {
     std::filesystem::create_directories(results_dir_);
     std::string filename;
     if (distance_ > 0) {
-        filename = results_dir_ + "/average_operations_" + decoder_name + "_d=" + std::to_string(distance_) + ".txt";
+        filename = results_dir_ + "/steps/" + decoder_name + "_d=" +
+            std::to_string(distance_) + "_p=" + std::to_string(p) +  ".txt";
     } else {
-        filename = results_dir_ + "/average_operations_" + decoder_name + ".txt";
+        filename = results_dir_ + "/steps/" + decoder_name + ".txt";
     }
-    std::ostringstream line;
-    line << p << "\t" << value << "\n";
-    write_to_file(filename, line.str(), true);
+    for (const auto& [steps, count] : frequencies) {
+        std::ostringstream line;
+        line << steps << "\t" << count << "\n";
+        write_to_file(filename, line.str(), true);
+    }
 }
 
 void Logger::log_progress(int current, int total, double p, int D, int interval_ms) {
