@@ -11,26 +11,31 @@
 
 // ClAYGDecoder inherits from UnionFind
 // It owns the clusters and the graph, but not its constituents
-class ClAYGDecoder final : UnionFindDecoder, public virtual Decoder {
+class ClAYGDecoder : public virtual UnionFindDecoder {
 public:
-    ClAYGDecoder() = default;
-
-    std::string decoder() override
+    ClAYGDecoder()
     {
-        return "clayg";
+        decoder_name_ = "clayg";
     }
 
     std::vector<std::shared_ptr<DecodingGraphEdge>> decode(std::shared_ptr<DecodingGraph> graph) override;
 
     std::vector<std::shared_ptr<DecodingGraphEdge>> clean(const std::shared_ptr<DecodingGraph>& decoding_graph);
 
-    void add(const std::shared_ptr<DecodingGraph>& graph, std::shared_ptr<DecodingGraphNode> node);
-
-    int get_last_growth_steps() const override { return last_growth_steps_; }
-
-private:
-    int last_growth_steps_ = 0;
+    virtual void add(const std::shared_ptr<DecodingGraph>& graph, std::shared_ptr<DecodingGraphNode> node);
 };
 
+class SingleLayerClAYGDecoder : public virtual ClAYGDecoder
+{
+public:
+    SingleLayerClAYGDecoder()
+    {
+        decoder_name_ = "sl_clayg";
+    }
+
+    std::vector<std::shared_ptr<DecodingGraphEdge>> decode(std::shared_ptr<DecodingGraph> graph) override;
+
+    void add(const std::shared_ptr<DecodingGraph>& graph, std::shared_ptr<DecodingGraphNode> node) override;
+};
 
 #endif //CLAYG_CLAYGDECODER_H

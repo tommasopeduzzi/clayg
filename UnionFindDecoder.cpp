@@ -60,7 +60,8 @@ vector<DecodingGraphEdge::FusionEdge> UnionFindDecoder::grow(const shared_ptr<Cl
         auto leaf_node = boundary_edge.leaf_node;
 
         auto edge = boundary_edge.edge;
-        edge->add_growth(0.5);
+        float growth = growth_policy_(tree_node->id(), leaf_node->id());
+        edge->add_growth(growth);
 
         if (edge->growth() >= edge->weight())
         {

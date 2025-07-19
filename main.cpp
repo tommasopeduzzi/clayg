@@ -133,6 +133,43 @@ int main(int argc, char* argv[])
             decoders.push_back(make_shared<UnionFindDecoder>());
         } else if (name == "clayg") {
             decoders.push_back(make_shared<ClAYGDecoder>());
+        } else if (name == "single_layer_clayg" || name == "sl_clayg") {
+            decoders.push_back(make_shared<SingleLayerClAYGDecoder>());
+        } else if (name == "clayg_third_growth") {
+            auto decoder = make_shared<ClAYGDecoder>();
+            decoder->set_growth_policy([] (const DecodingGraphNode::Id start, const DecodingGraphNode::Id end)
+            {
+                if (start.round == end.round)
+                    return 0.34;
+                if (start.round > end.round)
+                    return 1.0;
+                return 0.5;
+            });
+            decoder->set_decoder_name("clayg_third_growth");
+            decoders.push_back(decoder);
+        }
+        else if (name == "clayg_faster_backwards_growth") {
+            auto decoder = make_shared<ClAYGDecoder>();
+            decoder->set_growth_policy([] (const DecodingGraphNode::Id start, const DecodingGraphNode::Id end)
+            {
+                if (start.round > end.round)
+                    return 1.0;
+                return 0.5;
+            });
+            decoder->set_decoder_name("clayg_faster_backwards_growth");
+            decoders.push_back(decoder);
+        } else if (name == "sl_clayg_third_growth") {
+            auto decoder = make_shared<SingleLayerClAYGDecoder>();
+            decoder->set_growth_policy([] (const DecodingGraphNode::Id start, const DecodingGraphNode::Id end)
+            {
+                if (start.round == end.round)
+                    return 0.34;
+                if (start.round > end.round)
+                    return 1.0;
+                return 0.5;
+            });
+            decoder->set_decoder_name("sl_clayg_third_growth");
+            decoders.push_back(decoder);
         } else {
             cerr << "Unknown decoder: " << name << endl;
             exit(1);
