@@ -1,4 +1,7 @@
+from datetime import datetime
 import os
+import re
+import subprocess
 
 
 cwd = os.getcwd()
@@ -39,12 +42,12 @@ if use_probability_list:
     for d in distances:
         for p in probabilities:
             exit(1)
-            command = f"/home/tommaso-peduzzi/Documents/clayg/cmake-build-debug/clayg {d} {d} {p} {p*1.5} {','.join(decoders)} {output_dir} p_step=*2 dump=false runs={runs}; sleep 1; exit"
+            command = f"/home/tommaso-peduzzi/Documents/clayg/cmake-build-debug/clayg {d} {d} {p} {p*1.5} {','.join(decoders)} {output_dir} p_step=*2 dump=false runs={runs}; sleep 1; exit" # type: ignore
             subprocess.Popen(["xterm", "-e", f'cd "{cwd}" && {command}; bash'])
 else:
     for d in distances:
         exit(1)
-        command = f"/home/tommaso-peduzzi/Documents/clayg/cmake-build-debug/clayg {d} {d} {start} {end} {','.join(decoders)} {output_dir} p_step=*{step} dump=false runs={runs}; sleep 1; exit"
+        command = f"/home/tommaso-peduzzi/Documents/clayg/cmake-build-debug/clayg {d} {d} {start} {end} {','.join(decoders)} {output_dir} p_step=*{step} dump=false runs={runs}; sleep 1; exit" # type: ignore
         subprocess.Popen(["xterm", "-e", f'cd "{cwd}" && {command}; bash'])
 
 

@@ -159,7 +159,7 @@ int Logger::get_distance() const {
     return distance_;
 }
 
-void Logger::log_results_entry(double p, double value, const std::string& decoder_name) {
+void Logger::log_results_entry(double p, double value, int runs, const std::string& decoder_name) {
     std::filesystem::create_directories(results_dir_);
     std::string filename;
     if (distance_ > 0) {
@@ -168,7 +168,7 @@ void Logger::log_results_entry(double p, double value, const std::string& decode
         filename = results_dir_ + "/results/" + decoder_name + ".txt";
     }
     std::ostringstream line;
-    line << p << "\t" << value << "\n";
+    line << p << "\t" << value << "\t" << runs << "\n";
     write_to_file(filename, line.str(), true);
 }
 

@@ -47,10 +47,10 @@ unordered_map<string, string> parse_args(int argc, char* argv[])
         exit(1);
     }
 
-    if (args["p_step"][0] != '*' && args["p_step"][0] != '+')
+    if (args["p_step"][0] != '*' && args["p_step"][0] != '+' && args["p_step"][0] != '/')
     {
         cerr << "Error: Invalid p_step.\n";
-        cerr << "Usage: p_step=*{factor} or p_step=+{step}\n";
+        cerr << "Usage: p_step=[*/]{factor} or  p_step=+{step}\n";
         exit(1);
     }
 
@@ -198,8 +198,28 @@ int main(int argc, char* argv[])
         logger.prepare_steps_file(decoder->decoder_name());
     }
 
+    vector<pair<double, map<string, double>>> results;
+    static auto end_condition = [&] (double const current_p)
+    {
+        if (p_start < p_end)
+            return current_p <= p_end;
+        if (p_start > p_end)
+        {
+            bool const last_three_runs_corrected = std::size(results) >= 3 &&
+                std::all_of(results.end() - 3, results.end(), [&](const auto& run) {
+                    const auto& results_per_decoder = run.second;
+                    return std::all_of(decoders.begin(), decoders.end(), [&](const auto& decoder) {
+                        return results_per_decoder.at(decoder->decoder_name()) == 0;
+                    });
+                });
+            if (last_three_runs_corrected)
+                return false;
+            return current_p >= p_end;
+        }
+        return false;
+    };
 
-    while (p <= p_end)
+    do
     {
         map<string, int> errors;
         map<string, map<int, int>> growth_steps;
@@ -246,21 +266,26 @@ int main(int argc, char* argv[])
             Logger::log_progress(i + 1, runs, p, D);
         }
         // Log results and average growth steps for each decoder
+        results.push_back({p, {}});
         for (const auto& decoder : decoders) {
             double error_rate = static_cast<double>(errors[decoder->decoder_name()]) / runs;
-            logger.log_results_entry(p, error_rate, decoder->decoder_name());
+            logger.log_results_entry(p, error_rate, runs, decoder->decoder_name());
             logger.log_growth_steps(p, growth_steps[decoder->decoder_name()], decoder->decoder_name());
+            results.back().second[decoder->decoder_name()] = error_rate;
         }
         switch (p_step.first)
         {
         case '+':
             p += p_step.second;
             break;
+        case '/':
+            p /= p_step.second;
+            break;
         case '*':
         default:
             p *= p_step.second;
             break;
         }
-    }
+    } while (end_condition(p));
     return 0;
 }
