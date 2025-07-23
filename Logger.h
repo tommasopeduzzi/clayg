@@ -27,7 +27,7 @@ public:
     void log_errors(const std::vector<DecodingGraphEdge::Id>& error_ids) const;
     void log_corrections(const std::vector<DecodingGraphEdge::Id>& correction_ids, const std::string& decoder) const;
     void log_results_entry(double p, double value, int runs, const std::string& decoder_name);
-    void log_growth_steps(double p, const std::map<int, int>& frequencies, const std::string& decoder_name);
+    void log_growth_steps(double p, const std::map<double, int>& frequencies, const std::string& decoder_name);
     void prepare_results_file(const std::string& decoder_name);
     void prepare_steps_file(const std::string& decoder_name);
     void prepare_run_dir() const;

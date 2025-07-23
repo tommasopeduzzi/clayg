@@ -16,7 +16,7 @@ class UnionFindDecoder : public virtual Decoder
 {
 protected:
     std::vector<std::shared_ptr<Cluster>> m_clusters;
-    int last_growth_steps_ = 0;
+    double last_growth_steps_ = 0;
     std::function<float(DecodingGraphNode::Id, DecodingGraphNode::Id)> growth_policy_ =
         [](DecodingGraphNode::Id start, DecodingGraphNode::Id end)
         {
@@ -30,7 +30,7 @@ public:
         decoder_name_ = "uf";
     }
 
-    std::vector<std::shared_ptr<DecodingGraphEdge>> decode(std::shared_ptr<DecodingGraph> graph) override;
+    DecodingResult decode(std::shared_ptr<DecodingGraph> graph) override;
 
     std::vector<DecodingGraphEdge::FusionEdge> grow(const std::shared_ptr<Cluster>& cluster);
 

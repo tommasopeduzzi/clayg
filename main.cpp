@@ -85,12 +85,17 @@ vector<DecodingGraphEdge::Id> generate_errors(int D, int T, double p, uniform_re
 }
 
 int compute_logical(int logical, const set<int>& logical_edge_ids,
-                    const vector<shared_ptr<DecodingGraphEdge>>& error_edges)
+                    const DecodingResult& corrections)
 {
+    const auto considered_rounds = corrections.considered_up_to_round;
+    const auto error_edges = corrections.corrections;
     for (const auto& error : error_edges)
     {
         // Check if edge is relevant to final measurement
         if (error->id().type == DecodingGraphEdge::Type::MEASUREMENT)
+            continue;
+
+        if (error->id().round > considered_rounds)
             continue;
 
         if (logical_edge_ids.find(error->id().id) == logical_edge_ids.end())
@@ -135,6 +140,11 @@ int main(int argc, char* argv[])
             decoders.push_back(make_shared<ClAYGDecoder>());
         } else if (name == "single_layer_clayg" || name == "sl_clayg") {
             decoders.push_back(make_shared<SingleLayerClAYGDecoder>());
+        } else if (name == "clayg_stop_early") {
+            auto decoder = make_shared<ClAYGDecoder>();
+            decoder->set_stop_early(true);
+            decoder->set_decoder_name("clayg_stop_early");
+            decoders.push_back(decoder);
         } else if (name == "clayg_third_growth") {
             auto decoder = make_shared<ClAYGDecoder>();
             decoder->set_growth_policy([] (const DecodingGraphNode::Id start, const DecodingGraphNode::Id end)
@@ -222,7 +232,7 @@ int main(int argc, char* argv[])
     do
     {
         map<string, int> errors;
-        map<string, map<int, int>> growth_steps;
+        map<string, map<double, int>> growth_steps;
         for (const auto& decoder : decoders) {
             errors[decoder->decoder_name()] = 0;
             growth_steps[decoder->decoder_name()] = {};
@@ -242,20 +252,22 @@ int main(int argc, char* argv[])
             }
             bool uncorrected = false;
             for (const auto& decoder : decoders) {
-                int logical = 0;
-                logical = compute_logical(logical, logical_edge_ids, error_edges);
                 graph->reset();
                 graph->mark(error_edges);
-                auto corrections = decoder->decode(graph);
+                auto decoding_results = decoder->decode(graph);
                 vector<DecodingGraphEdge::Id> correction_ids;
-                for (auto& edge : corrections) {
+                for (auto& edge : decoding_results.corrections) {
                     correction_ids.push_back(edge->id());
                 }
                 logger.log_corrections(correction_ids, decoder->decoder_name());
-                int logical_result = compute_logical(logical, logical_edge_ids, corrections);
+                int logical = compute_logical(0, logical_edge_ids, {
+                    error_edges,
+                    decoding_results.considered_up_to_round
+                });
+                int logical_result = compute_logical(logical, logical_edge_ids, decoding_results);
                 errors[decoder->decoder_name()] += logical_result;
                 growth_steps[decoder->decoder_name()][decoder->get_last_growth_steps()] += 1;;
-                if (logical_result != logical) {
+                if (logical_result != 0) {
                     uncorrected = true;
                 }
             }

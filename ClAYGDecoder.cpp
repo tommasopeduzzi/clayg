@@ -2,13 +2,15 @@
 // Created by tommasopeduzzi on 1/28/24.
 //
 
-#include <iostream>
 #include "ClAYGDecoder.h"
+
+#include <cmath>
+
 #include "Logger.h"
 
 using namespace std;
 
-vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
+DecodingResult ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
 {
     vector<shared_ptr<DecodingGraphNode>> marked_nodes;
 
@@ -36,9 +38,11 @@ vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(shared_ptr<DecodingGr
 
     m_clusters = {};
     int step = 0;
-    last_growth_steps_ = 0;
-    for (int round = 0; round <= rounds; round++)
+    int considered_up_to_round = rounds - 1;
+    last_growth_steps_ = -(rounds-1); // don't count last round as being negative
+    for (int round = 0; round < rounds; round++)
     {
+        last_growth_steps_ = ceil(last_growth_steps_);
         vector<shared_ptr<DecodingGraphNode>> nodes;
         for (const auto& node : marked_nodes)
         {
@@ -54,10 +58,9 @@ vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(shared_ptr<DecodingGr
             added_nodes++;
         }
         auto new_error_edges = clean(decoding_graph);
-        logger.log_clusters(m_clusters, "clayg", step++);
+        logger.log_clusters(m_clusters, decoder_name_, step++);
         error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
-        int g = 1;
-        for (int _ = 0; _ < g; _++)
+        for (int growth_round = 0; growth_round < growth_rounds_; growth_round++)
         {
             vector<DecodingGraphEdge::FusionEdge> fusion_edges;
             for (const auto& cluster : m_clusters)
@@ -71,17 +74,28 @@ vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(shared_ptr<DecodingGr
             }
             if (Logger::instance().is_dump_enabled())
             {
-                logger.log_clusters(m_clusters, "clayg", step++);
+                logger.log_clusters(m_clusters, decoder_name_, step++);
             }
             merge(fusion_edges);
+            if (stop_early_ && Cluster::all_clusters_are_neutral(m_clusters))
+            {
+                break;
+            }
+            // FIXME: The last round is accounted for as a 'real' step
+            last_growth_steps_ = last_growth_steps_ + (round == rounds-1 ? 1 :  1.0/growth_rounds_);
         }
         new_error_edges = clean(decoding_graph);
         error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
+        if (stop_early_ && Cluster::all_clusters_are_neutral(m_clusters))
+        {
+            considered_up_to_round = round;
+            break;
+        }
     }
 
     while (!Cluster::all_clusters_are_neutral(m_clusters))
     {
-        last_growth_steps_++;
+        last_growth_steps_ += 1;
         vector<DecodingGraphEdge::FusionEdge> fusion_edges;
         for (const auto& cluster : m_clusters)
         {
@@ -92,14 +106,14 @@ vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::decode(shared_ptr<DecodingGr
                 fusion_edges.push_back(fusion_edge);
             }
         }
-        logger.log_clusters(m_clusters, "clayg", step++);
+        logger.log_clusters(m_clusters, decoder_name_, step++);
         merge(fusion_edges);
     }
 
     auto new_error_edges = clean(decoding_graph);
     error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
 
-    return error_edges;
+    return {error_edges, considered_up_to_round};
 }
 
 void ClAYGDecoder::add(const shared_ptr<DecodingGraph>& graph, shared_ptr<DecodingGraphNode> node)
@@ -169,7 +183,7 @@ vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::clean(const shared_ptr<Decod
     return error_edges;
 }
 
-vector<shared_ptr<DecodingGraphEdge>> SingleLayerClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
+DecodingResult SingleLayerClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
 {
     vector<shared_ptr<DecodingGraphNode>> marked_nodes;
 
@@ -197,9 +211,11 @@ vector<shared_ptr<DecodingGraphEdge>> SingleLayerClAYGDecoder::decode(shared_ptr
 
     m_clusters = {};
     int step = 0;
-    last_growth_steps_ = 0;
-    for (int round = 0; round <= rounds; round++)
+    int considered_up_to_round = rounds - 1;
+    last_growth_steps_ = -(growth_rounds_-1);
+    for (int round = 0; round < rounds; round++)
     {
+        last_growth_steps_ = ceil(last_growth_steps_);
         vector<shared_ptr<DecodingGraphNode>> nodes;
         for (const auto& node : marked_nodes)
         {
@@ -215,10 +231,9 @@ vector<shared_ptr<DecodingGraphEdge>> SingleLayerClAYGDecoder::decode(shared_ptr
             added_nodes++;
         }
         auto new_error_edges = clean(decoding_graph);
-        logger.log_clusters(m_clusters, "clayg", step++);
+        logger.log_clusters(m_clusters, decoder_name_, step++);
         error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
-        int g = 1;
-        for (int _ = 0; _ < g; _++)
+        for (int growth_round = 0; growth_round < growth_rounds_; growth_round++)
         {
             vector<DecodingGraphEdge::FusionEdge> fusion_edges;
             for (const auto& cluster : m_clusters)
@@ -232,12 +247,22 @@ vector<shared_ptr<DecodingGraphEdge>> SingleLayerClAYGDecoder::decode(shared_ptr
             }
             if (Logger::instance().is_dump_enabled())
             {
-                logger.log_clusters(m_clusters, "clayg", step++);
+                logger.log_clusters(m_clusters, decoder_name_, step++);
             }
             merge(fusion_edges);
+            if (stop_early_ && Cluster::all_clusters_are_neutral(m_clusters))
+            {
+                break;
+            }
+            last_growth_steps_ = last_growth_steps_ + (round == rounds-1 ? 1 :  1.0/growth_rounds_);
         }
         new_error_edges = clean(decoding_graph);
         error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
+        if (stop_early_ && Cluster::all_clusters_are_neutral(m_clusters))
+        {
+            considered_up_to_round = round;
+            break;
+        }
     }
 
     while (!Cluster::all_clusters_are_neutral(m_clusters))
@@ -253,14 +278,14 @@ vector<shared_ptr<DecodingGraphEdge>> SingleLayerClAYGDecoder::decode(shared_ptr
                 fusion_edges.push_back(fusion_edge);
             }
         }
-        logger.log_clusters(m_clusters, "clayg", step++);
+        logger.log_clusters(m_clusters, decoder_name_, step++);
         merge(fusion_edges);
     }
 
     auto new_error_edges = clean(decoding_graph);
     error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
 
-    return error_edges;
+    return {error_edges, considered_up_to_round};
 }
 
 void SingleLayerClAYGDecoder::add(const shared_ptr<DecodingGraph>& graph, shared_ptr<DecodingGraphNode> node)

@@ -10,7 +10,7 @@
 
 using namespace std;
 
-vector<shared_ptr<DecodingGraphEdge>> PeelingDecoder::decode(vector<shared_ptr<Cluster>>& clusters,
+DecodingResult PeelingDecoder::decode(vector<shared_ptr<Cluster>>& clusters,
                                                              const shared_ptr<DecodingGraph>&
                                                              decoding_graph)
 {
@@ -24,7 +24,7 @@ vector<shared_ptr<DecodingGraphEdge>> PeelingDecoder::decode(vector<shared_ptr<C
         auto new_error_edges = peel(cluster, decoding_graph);
         error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
     }
-    return error_edges;
+    return { error_edges, decoding_graph->t() };
 }
 
 vector<shared_ptr<DecodingGraphEdge>> PeelingDecoder::peel(shared_ptr<Cluster>& cluster,

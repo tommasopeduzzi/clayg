@@ -172,7 +172,7 @@ void Logger::log_results_entry(double p, double value, int runs, const std::stri
     write_to_file(filename, line.str(), true);
 }
 
-void Logger::log_growth_steps(double p, const std::map<int, int>& frequencies, const std::string& decoder_name) {
+void Logger::log_growth_steps(double p, const std::map<double, int>& frequencies, const std::string& decoder_name) {
     std::filesystem::create_directories(results_dir_);
     std::string filename;
     if (distance_ > 0) {

@@ -11,7 +11,7 @@
 
 using namespace std;
 
-vector<shared_ptr<DecodingGraphEdge>> UnionFindDecoder::decode(const shared_ptr<DecodingGraph> graph)
+DecodingResult UnionFindDecoder::decode(const shared_ptr<DecodingGraph> graph)
 {
     // Initialize clusters
     m_clusters = {};

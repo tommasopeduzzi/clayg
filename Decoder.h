@@ -6,14 +6,21 @@
 #define CLAYG_DECODER_H
 
 #include <string>
+#include <vector>
 
 #include "DecodingGraph.h"
+
+// Type to represent decoding results: pair<vector of error edges, int number of rounds considered>
+struct DecodingResult {
+    std::vector<std::shared_ptr<DecodingGraphEdge>> corrections;
+    int considered_up_to_round;
+};
 
 class Decoder {
 public:
     virtual ~Decoder() = default;
 
-    virtual std::vector<std::shared_ptr<DecodingGraphEdge>> decode(std::shared_ptr<DecodingGraph> graph) {
+    virtual DecodingResult decode(std::shared_ptr<DecodingGraph> graph) {
         return {};
     };
 

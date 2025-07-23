@@ -6,13 +6,14 @@
 #define CLAYG_PEELINGDECODER_H
 
 
+#include "Decoder.h"
 #include "DecodingGraph.h"
 
 class PeelingDecoder {
 public:
     PeelingDecoder() = default;
 
-    static std::vector<std::shared_ptr<DecodingGraphEdge>> decode(std::vector<std::shared_ptr<Cluster>>& clusters,
+    static DecodingResult decode(std::vector<std::shared_ptr<Cluster>>& clusters,
                                                                   const std::shared_ptr<DecodingGraph>& decoding_graph);
 
     static std::vector<std::shared_ptr<DecodingGraphEdge>> peel(std::shared_ptr<Cluster>& cluster,
