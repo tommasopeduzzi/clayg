@@ -287,7 +287,7 @@ class GraphVisualizer3D:
             except Exception:
                 continue
         distance = virtual_edge_count ** 0.5
-        nodes_per_layer = math.ceil(distance / 2) if distance > 0 else 1
+        nodes_per_layer = math.floor(distance / 2) + 1  if distance > 0 else 1
 
         for node in self.node_list:
             try:
@@ -297,12 +297,12 @@ class GraphVisualizer3D:
             color = "red" if t == "Ancilla" else "blue"
             self.node_colors[node] = color
             if t == "Virtual":
-                if i < nodes_per_layer:
-                    x = i - 0.5
+                if i == 0:
+                    x = nodes_per_layer / 2 - 0.5
                     y = 0
                 else:
-                    x = i % nodes_per_layer
-                    y = distance
+                    x = nodes_per_layer / 2 - 1
+                    y = distance + 0.5
                 z = (rounds - 1) / 2
             else:
                 x = (i % nodes_per_layer) - ((i // nodes_per_layer) % 2) * 0.5

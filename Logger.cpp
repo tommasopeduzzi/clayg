@@ -70,9 +70,9 @@ void Logger::log_clusters(const std::vector<std::shared_ptr<Cluster>>& clusters,
         }
         cluster_id++;
     }
-    std::string dir = "data/runs/" + std::to_string(run_id);
+    std::string dir = "data/runs/" + std::to_string(run_id) + "/" + decoder;
     std::filesystem::create_directories(dir);
-    std::string filename = dir + "/clusters_" + decoder + "_step_" + std::to_string(step) + ".txt";
+    std::string filename = dir + "/clusters_step_" + std::to_string(step) + ".txt";
     write_to_file(filename, content.str(), false);
 }
 
@@ -113,9 +113,9 @@ void Logger::log_corrections(const std::vector<DecodingGraphEdge::Id>& correctio
     for (const auto& id : correction_ids) {
         content << id.type << "-" << id.round << "-" << id.id << "\n";
     }
-    std::string dir = "data/runs/" + std::to_string(run_id);
+    std::string dir = "data/runs/" + std::to_string(run_id) + "/" + decoder;
     std::filesystem::create_directories(dir);
-    std::string filename = dir + "/corrections_" + decoder + ".txt";
+    std::string filename = dir + "/corrections.txt";
     write_to_file(filename, content.str(), false);
 }
 
@@ -131,24 +131,14 @@ void Logger::prepare_results_file(const std::string& decoder_name) {
 
 void Logger::prepare_steps_file(const std::string& decoder_name) {
     std::filesystem::create_directories(results_dir_ + "/results");
-    std::string filename;
-    if (distance_ > 0) {
-        filename = results_dir_ + "/average_operations_" + decoder_name + "_d=" + std::to_string(distance_) + ".txt";
-    } else {
-        filename = results_dir_ + "/average_operations_" + decoder_name + ".txt";
-    }
 }
 
 
 void Logger::prepare_run_dir() const {
     if (!dump_enabled) return;
-    std::string run_dir = "data/runs/" + std::to_string(run_id);
+    const std::string run_dir = "data/runs/" + std::to_string(run_id);
+    std::filesystem::remove_all(run_dir);
     std::filesystem::create_directories(run_dir);
-    // Create steps and results subdirectories at the beginning
-    clear_files_by_pattern(run_dir, "clusters_");
-    clear_files_by_pattern(run_dir, "graph.txt");
-    clear_files_by_pattern(run_dir, "errors.txt");
-    clear_files_by_pattern(run_dir, "corrections_");
 }
 
 void Logger::set_distance(int distance) {
