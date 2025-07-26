@@ -40,6 +40,12 @@ public:
         {
             return type == id.type && round == id.round && this->id == id.id;
         };
+        bool operator<(const Id& rhs) const
+        {
+            return type < rhs.type ||
+                   (type == rhs.type && round < rhs.round) ||
+                   (type == rhs.type && round == rhs.round && id < rhs.id);
+        }
     };
 
 private:
