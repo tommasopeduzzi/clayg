@@ -149,7 +149,7 @@ shared_ptr<DecodingGraph> DecodingGraph::rotated_surface_code(int D, int T) {
                         auto edge = make_shared<DecodingGraphEdge>(current_edge_id, nodes);
                         graph->addEdge(edge);
                         current_edge_id++;
-                        if (y == 1)
+                        if (y == 3)
                             graph->addLogicalEdge(edge);
                     }
                     auto other_node_id = DecodingGraphNode::Id{DecodingGraphNode::ANCILLA, t,
@@ -158,7 +158,7 @@ shared_ptr<DecodingGraph> DecodingGraph::rotated_surface_code(int D, int T) {
                     auto edge = make_shared<DecodingGraphEdge>(current_edge_id, nodes);
                     graph->addEdge(edge);
                     current_edge_id++;
-                    if (y == 1)
+                    if (y == 3)
                         graph->addLogicalEdge(edge);
                 }
 

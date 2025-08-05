@@ -71,6 +71,7 @@ Performance improvements include:
 import argparse
 import math
 import os
+import re
 import sys
 import time
 
@@ -105,7 +106,7 @@ class GraphVisualizer3D:
         self.corrections_file = corrections_file
 
         # Data structures for the graph.
-        self.G = nx.Graph()
+        self.G = nx.MultiGraph()
         self.error_edges = set()
         self.correction_edges = set()
         self.clusters = {}
@@ -234,15 +235,15 @@ class GraphVisualizer3D:
             sys.exit(1)
         steps = []
         for filename in files:
-            try:
-                step = int(os.path.splitext(filename)[0].split("_")[1])
+            # regex of the form "clusters_step_{step}.txt"
+            re_match = re.search(r'clusters_step_(\d+)\.txt', filename)
+            step = int(re_match.group(1)) if re_match else None
+            if step is not None and step >= 0:
                 steps.append(step)
-            except (ValueError, IndexError):
-                continue
         steps.sort()
         self.cluster_steps = steps
         for step in steps:
-            cluster_file = os.path.join(self.clusters_dir, f"cluster_{step}.txt")
+            cluster_file = os.path.join(self.clusters_dir, f"clusters_step_{step}.txt")
             step_clusters = {}
             try:
                 with open(cluster_file, 'r') as f:
@@ -301,8 +302,8 @@ class GraphVisualizer3D:
                     x = nodes_per_layer / 2 - 0.5
                     y = 0
                 else:
-                    x = nodes_per_layer / 2 - 1
-                    y = distance + 0.5
+                    x = nodes_per_layer / 2 - 0.5
+                    y = distance - 0.5
                 z = (rounds - 1) / 2
             else:
                 x = (i % nodes_per_layer) - ((i // nodes_per_layer) % 2) * 0.5
@@ -423,18 +424,25 @@ class GraphVisualizer3D:
                 error_segments.append(seg)
             if data.get('label', '') in self.correction_edges:
                 corrections_segment.append(seg)
-            if self.show_edge_labels:
-                xm = (draw_pos[u][0] + draw_pos[v][0]) / 2
-                ym = (draw_pos[u][1] + draw_pos[v][1]) / 2
-                zm = (draw_pos[u][2] + draw_pos[v][2]) / 2
-                label = data.get('label', '')
-                try:
-                    etype, eround, eid = self.parse_edge_str(label)
-                    display_label = f"{etype}-{eround}-{eid}"
-                except Exception:
-                    display_label = label
-                txt = self.ax.text(xm, ym, zm, display_label, size=10, color='black')
-                self.edge_texts.append(txt)
+            if not self.show_edge_labels:
+                continue
+            # Check for parallel edges and space labels if needed
+            edges_between = [e for e in self.G.edges(data=True) if (e[0] == u and e[1] == v) or (e[0] == v and e[1] == u)]
+            num_parallel = len(edges_between)
+            # Find index of current edge among parallel edges
+            edge_idx = [i for i, e in enumerate(edges_between) if e[2].get('label', '') == data.get('label', '')]
+            idx = edge_idx[0] + 1 if edge_idx else 1
+            xm = draw_pos[u][0] + (draw_pos[v][0] - draw_pos[u][0]) / (num_parallel + 1) * idx
+            ym = draw_pos[u][1] + (draw_pos[v][1] - draw_pos[u][1]) / (num_parallel + 1) * idx
+            zm = draw_pos[u][2] + (draw_pos[v][2] - draw_pos[u][2]) / (num_parallel + 1) * idx
+            label = data.get('label', '')
+            try:
+                etype, eround, eid = self.parse_edge_str(label)
+                display_label = f"{eround}-{eid}"
+            except Exception:
+                display_label = label
+            txt = self.ax.text(xm, ym, zm, display_label, size=10, color='black')
+            self.edge_texts.append(txt)
 
         # Update normal edges: show only if "Edges" is enabled.
         if self.show_edges:
@@ -541,7 +549,7 @@ def main():
     parser.add_argument('run_id', help='Run to visualize.')
     parser.add_argument('--graph_file', help='Path to the graph file')
     parser.add_argument('--errors_file', help='Path to the errors file')
-    parser.add_argument('--decoder', help='Decoder for which to show clustering.', choices=['uf', 'clayg'])
+    parser.add_argument('--decoder', help='Decoder for which to show clustering.')
     parser.add_argument('--clusters', help='Directory containing cluster step files', default=None)
     parser.add_argument("--corrections_file", help="File containing corrections by decoder")
     args = parser.parse_args()
@@ -550,17 +558,20 @@ def main():
         args.graph_file = f"{args.directory}/{args.run_id}/graph.txt"
     if not args.errors_file:
         args.errors_file = f"{args.directory}/{args.run_id}/errors.txt"
-    if not args.clusters:
-        args.clusters = f"{args.directory}/{args.run_id}/{args.decoder}"
-    if not args.corrections_file:
-        args.corrections_file = f"{args.directory}/{args.run_id}/{args.decoder}/corrections.txt"
+    if args.decoder:
+        if not args.clusters:
+            args.clusters = f"{args.directory}/{args.run_id}/{args.decoder}"
+        if not args.corrections_file:
+            args.corrections_file = f"{args.directory}/{args.run_id}/{args.decoder}/corrections.txt"
 
     visualizer = GraphVisualizer3D(args.graph_file, args.errors_file, clusters_dir=args.clusters,
                                    corrections_file=args.corrections_file)
 
     # Create check buttons.
     rax = plt.axes([0.01, 0.4, 0.2, 0.35])
-    check_labels = ['Nodes', 'Node Labels', 'Edges', 'Edge Labels', 'Errors', 'Corrections']
+    check_labels = ['Nodes', 'Node Labels', 'Edges', 'Edge Labels', 'Errors']
+    if args.corrections_file:
+        check_labels.append('Corrections')
     if args.clusters:
         check_labels.append('Clusters')
     check_labels.append('Single Layer')

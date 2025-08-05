@@ -4,8 +4,6 @@
 
 #include <algorithm>
 #include <queue>
-#include <stdexcept>
-#include <iostream>
 #include "PeelingDecoder.h"
 
 using namespace std;
@@ -40,7 +38,6 @@ vector<shared_ptr<DecodingGraphEdge>> PeelingDecoder::peel(shared_ptr<Cluster>& 
     shared_ptr<DecodingGraphNode> start_node = nullptr;
     for (const auto& node : cluster->nodes())
     {
-        ;
         if (node->id().type == DecodingGraphNode::Type::VIRTUAL)
         {
             start_node = node;

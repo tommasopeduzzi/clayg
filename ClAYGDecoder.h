@@ -42,7 +42,7 @@ public:
         : ClAYGDecoder(growth_rounds, stop_early)
     {
         decoder_name_ = "sl_clayg";
-        decoding_graph_ = DecodingGraph::rotated_surface_code(1, 1);
+        decoding_graph_ = DecodingGraph::rotated_surface_code(2, 2);
     }
 
     DecodingResult decode(std::shared_ptr<DecodingGraph> graph) override;

@@ -57,6 +57,32 @@ unordered_map<string, string> parse_args(int argc, char* argv[])
     return args;
 }
 
+vector<DecodingGraphEdge::Id> parse_errors(string errors)
+{
+    vector<DecodingGraphEdge::Id> error_edge_ids;
+    regex re("(\\d+)-(\\d+)-(\\d+)");
+    smatch match;
+    istringstream stream(errors);
+    while (getline(stream, errors))
+    {
+        if (regex_search(errors, match, re))
+        {
+            DecodingGraphEdge::Id id;
+            id.type = static_cast<DecodingGraphEdge::Type>(stoi(match[1].str()));
+            id.round = stoi(match[2].str());
+            id.id = stoi(match[3].str());
+            error_edge_ids.push_back(id);
+        }
+        // check if line is not only whitespace
+        else if (!regex_match(errors, regex("^\\s*$")))
+        {
+            cerr << "Error: Invalid error format: " << errors << endl;
+            exit(1);
+        }
+    }
+    return error_edge_ids;
+}
+
 vector<DecodingGraphEdge::Id> generate_errors(int D, int T, double p, uniform_real_distribution<double>& dis,
                                               mt19937& gen)
 {
@@ -179,6 +205,11 @@ int main(int argc, char* argv[])
                 return 0.5;
             });
             decoder->set_decoder_name("sl_clayg_third_growth");
+            decoders.push_back(decoder);
+        } else if (name == "sl_clayg_stop_early") {
+            auto decoder = make_shared<SingleLayerClAYGDecoder>();
+            decoder->set_decoder_name("sl_clayg_stop_early");
+            decoder->set_stop_early(true);
             decoders.push_back(decoder);
         } else {
             cerr << "Unknown decoder: " << name << endl;
