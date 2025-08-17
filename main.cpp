@@ -194,17 +194,10 @@ int main(int argc, char* argv[])
             });
             decoder->set_decoder_name("clayg_faster_backwards_growth");
             decoders.push_back(decoder);
-        } else if (name == "sl_clayg_third_growth") {
+        } else if (name == "sl_clayg_two_growth_rounds") {
             auto decoder = make_shared<SingleLayerClAYGDecoder>();
-            decoder->set_growth_policy([] (const DecodingGraphNode::Id start, const DecodingGraphNode::Id end)
-            {
-                if (start.round == end.round)
-                    return 0.34;
-                if (start.round > end.round)
-                    return 1.0;
-                return 0.5;
-            });
-            decoder->set_decoder_name("sl_clayg_third_growth");
+            decoder->set_growth_rounds(2);
+            decoder->set_decoder_name("sl_clayg_two_growth_rounds");
             decoders.push_back(decoder);
         } else if (name == "sl_clayg_stop_early") {
             auto decoder = make_shared<SingleLayerClAYGDecoder>();

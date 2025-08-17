@@ -46,6 +46,7 @@ DecodingResult ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
     m_clusters = {};
     int step = 0;
     int considered_up_to_round = rounds - 1;
+    int last_encountered_non_neutral_cluster = 0;
     last_growth_steps_ = -(rounds-1); // don't count last round as being negative
     for (int round = 0; round < rounds; round++)
     {
@@ -67,6 +68,9 @@ DecodingResult ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
         auto new_error_edges = clean(decoding_graph_);
         logger.log_clusters(m_clusters, decoder_name_, step++);
         error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
+        // Growth after adding last round belongs to the bulk growth
+        if (round == rounds-1)
+            break;
         for (int growth_round = 0; growth_round < growth_rounds_; growth_round++)
         {
             vector<DecodingGraphEdge::FusionEdge> fusion_edges;
@@ -84,19 +88,26 @@ DecodingResult ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
                 logger.log_clusters(m_clusters, decoder_name_, step++);
             }
             merge(fusion_edges);
+            last_growth_steps_ += (1.0/growth_rounds_);
             if (stop_early_ && Cluster::all_clusters_are_neutral(m_clusters))
             {
                 break;
             }
-            // FIXME: The last round is accounted for as a 'real' step
-            last_growth_steps_ = last_growth_steps_ + (round == rounds-1 ? 1 :  1.0/growth_rounds_);
         }
         new_error_edges = clean(decoding_graph_);
         error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
         if (stop_early_ && Cluster::all_clusters_are_neutral(m_clusters))
         {
-            considered_up_to_round = round;
-            break;
+            if (round-last_encountered_non_neutral_cluster >= (decoding_graph_->d()-1)/2)
+            {
+
+                considered_up_to_round = round;
+                break;
+            }
+        }
+        else
+        {
+            last_encountered_non_neutral_cluster = round;
         }
     }
 
