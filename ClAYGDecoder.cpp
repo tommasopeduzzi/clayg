@@ -279,7 +279,7 @@ DecodingResult SingleLayerClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
                 logger.log_clusters(m_clusters, decoder_name_, step++);
             }
             merge(fusion_edges);
-            last_growth_steps_ = last_growth_steps_ + (round == rounds-1 ? 1 :  1.0/growth_rounds_);
+            last_growth_steps_ += 1.0/growth_rounds_;
             if (stop_early_ && Cluster::all_clusters_are_neutral(m_clusters))
             {
                 break;
@@ -303,7 +303,7 @@ DecodingResult SingleLayerClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
 
     while (!Cluster::all_clusters_are_neutral(m_clusters))
     {
-        last_growth_steps_++;
+        last_growth_steps_ += 1;
         vector<DecodingGraphEdge::FusionEdge> fusion_edges;
         for (const auto& cluster : m_clusters)
         {

@@ -39,6 +39,7 @@ unordered_map<string, string> parse_args(int argc, char* argv[])
     if (args.find("p_step") == args.end()) args["p_step"] = "0.005";
     if (args.find("dump") == args.end()) args["dump"] = "false";
     if (args.find("runs") == args.end()) args["runs"] = "10000";
+    if (args.find("consider_idling") == args.end()) args["consider_idling"] = "false";
 
     if (args.size() < 6) // D, T, p_start, p_end, decoders, results
     {
@@ -146,6 +147,7 @@ int main(int argc, char* argv[])
     bool dump = string(args["dump"]) == "true";
     logger.set_dump_enabled(dump);
     int runs = stoi(args["runs"]);
+    bool consider_idling = args["consider_idling"] == "true";
 
     // Parse decoders argument (comma-separated)
     vector<string> decoder_names;
@@ -288,7 +290,29 @@ int main(int argc, char* argv[])
                     error_edges,
                     decoding_results.considered_up_to_round
                 });
-                int logical_result = compute_logical(logical, logical_edge_ids, decoding_results);
+                logical = compute_logical(logical, logical_edge_ids, decoding_results);
+                if (consider_idling)
+                {
+                    int num_growth_steps = decoder->get_last_growth_steps();
+                    if (num_growth_steps > 0)
+                    {
+                        auto idling_error_edges = vector<shared_ptr<DecodingGraphEdge>>{};
+                        for (int step = 0; step < num_growth_steps; step++)
+                        {
+                            auto new_error_ids = generate_errors(D, 1, p, dis, gen);
+                            for (auto id : new_error_ids)
+                            {
+                                auto edge = graph->edge(id).value();
+                                idling_error_edges.push_back(edge);
+                            }
+                        }
+                        logical = compute_logical(logical, logical_edge_ids, {
+                            idling_error_edges,
+                            decoding_results.considered_up_to_round
+                        });
+                    }
+                }
+
                 errors[decoder->decoder_name()] += logical_result;
                 growth_steps[decoder->decoder_name()][decoder->get_last_growth_steps()] += 1;;
                 if (logical_result != 0) {
