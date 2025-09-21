@@ -313,9 +313,9 @@ int main(int argc, char* argv[])
                     }
                 }
 
-                errors[decoder->decoder_name()] += logical_result;
+                errors[decoder->decoder_name()] += logical;
                 growth_steps[decoder->decoder_name()][decoder->get_last_growth_steps()] += 1;;
-                if (logical_result != 0) {
+                if (logical != 0) {
                     uncorrected = true;
                 }
             }
