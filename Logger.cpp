@@ -66,7 +66,17 @@ void Logger::log_clusters(const std::vector<std::shared_ptr<Cluster>>& clusters,
     int cluster_id = 0;
     for (const auto& cluster : clusters) {
         for (const auto& edge : cluster->edges()) {
-            content << edge->id().type << "-" << edge->id().round << "-" << edge->id().id << "," << cluster_id << "\n";
+            content << edge->id().type << "-" << edge->id().round << "-" << edge->id().id;
+            auto tree_node = edge->nodes().first.lock();
+            content << "," << tree_node->id().type << "-" << tree_node->id().round << "-" << tree_node->id().id;
+            content << "," << "1.0" << "," << cluster_id << "\n";
+        }
+        for (const auto& boundary : cluster->boundary()) {
+            content << boundary.edge->id().type << "-" << boundary.edge->id().round << "-" << boundary.edge->id().id;
+            // log tree node
+            content << "," << boundary.tree_node->id().type << "-" << boundary.tree_node->id().round << "-" << boundary.tree_node->id().id;
+            // log edge growth
+            content << "," << boundary.edge->growth() << "," << cluster_id << "\n";
         }
         cluster_id++;
     }

@@ -235,7 +235,6 @@ class GraphVisualizer3D:
             sys.exit(1)
         steps = []
         for filename in files:
-            # regex of the form "clusters_step_{step}.txt"
             re_match = re.search(r'clusters_step_(\d+)\.txt', filename)
             step = int(re_match.group(1)) if re_match else None
             if step is not None and step >= 0:
@@ -244,7 +243,7 @@ class GraphVisualizer3D:
         self.cluster_steps = steps
         for step in steps:
             cluster_file = os.path.join(self.clusters_dir, f"clusters_step_{step}.txt")
-            step_clusters = {}
+            step_clusters = []
             try:
                 with open(cluster_file, 'r') as f:
                     for line in f:
@@ -252,11 +251,18 @@ class GraphVisualizer3D:
                         if not line:
                             continue
                         parts = line.split(',')
-                        if len(parts) != 2:
+                        if len(parts) != 4:
                             continue
                         edge_id = parts[0].strip()
-                        cluster_id = parts[1].strip()
-                        step_clusters[edge_id] = cluster_id
+                        tree_node_id = parts[1].strip()
+                        growth = parts[2].strip()
+                        cluster_id = parts[3].strip()
+                        step_clusters.append({
+                            'edge_id': edge_id,
+                            'tree_node_id': tree_node_id,
+                            'growth': growth,
+                            'cluster_id': cluster_id
+                        })
                 self.clusters[step] = step_clusters
             except Exception as e:
                 print(f"Error reading cluster file {cluster_file}: {e}")
@@ -469,12 +475,38 @@ class GraphVisualizer3D:
         # Prepare cluster edges.
         cluster_segments = []
         if self.clusters_dir and self.show_clusters:
-            step_clusters = self.clusters.get(self.current_cluster_step, {})
-            for u, v, data in self.G.edges(data=True):
-                if u not in visible_nodes or v not in visible_nodes:
-                    continue
-                if data.get('label', '') in step_clusters:
-                    cluster_segments.append([draw_pos[u], draw_pos[v]])
+            step_clusters = self.clusters.get(self.current_cluster_step, [])
+            for cluster_entry in step_clusters:
+                edge_id = cluster_entry['edge_id']
+                tree_node_id = cluster_entry['tree_node_id']
+                growth = float(cluster_entry['growth'])
+                # Find the edge in the graph matching edge_id
+                for u, v, data in self.G.edges(data=True):
+                    if u not in visible_nodes or v not in visible_nodes:
+                        continue
+                    if data.get('label', '') == edge_id:
+                        # Find which node matches tree_node_id
+                        if u == tree_node_id:
+                            start = draw_pos[u]
+                            end = draw_pos[v]
+                        elif v == tree_node_id:
+                            start = draw_pos[v]
+                            end = draw_pos[u]
+                        else:
+                            # fallback: use u as start
+                            start = draw_pos[u]
+                            end = draw_pos[v]
+                        # Compute the segment according to growth
+                        seg = [
+                            start,
+                            (
+                                start[0] + (end[0] - start[0]) * growth,
+                                start[1] + (end[1] - start[1]) * growth,
+                                start[2] + (end[2] - start[2]) * growth
+                            )
+                        ]
+                        cluster_segments.append(seg)
+                        break
         if cluster_segments:
             self.cluster_edge_collection.set_segments(cluster_segments)
             self.cluster_edge_collection.set_color('blue')
