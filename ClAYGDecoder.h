@@ -15,6 +15,7 @@ class ClAYGDecoder : public virtual UnionFindDecoder {
 protected:
     int growth_rounds_ = 1;
     bool stop_early_ = false;
+    int current_round_ = 0;
     std::shared_ptr<DecodingGraph> decoding_graph_;
 public:
     explicit ClAYGDecoder(const int growth_rounds = 1, const bool stop_early = false)
@@ -24,6 +25,8 @@ public:
     }
 
     DecodingResult decode(std::shared_ptr<DecodingGraph> graph) override;
+
+    void merge(const std::vector<DecodingGraphEdge::FusionEdge>& fusion_edges) override;
 
     std::vector<std::shared_ptr<DecodingGraphEdge>> clean(const std::shared_ptr<DecodingGraph>& decoding_graph);
 

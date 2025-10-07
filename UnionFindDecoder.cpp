@@ -28,6 +28,7 @@ DecodingResult UnionFindDecoder::decode(const shared_ptr<DecodingGraph> graph)
 
     int steps = 0;
     // Main Union Find loop
+    logger.log_clusters(m_clusters, "uf", steps++);
     while (!Cluster::all_clusters_are_neutral(m_clusters))
     {
         graph->node(DecodingGraphNode::Id{DecodingGraphNode::ANCILLA, 4, 2});

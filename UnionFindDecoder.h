@@ -34,7 +34,7 @@ public:
 
     std::vector<DecodingGraphEdge::FusionEdge> grow(const std::shared_ptr<Cluster>& cluster);
 
-    void merge(const std::vector<DecodingGraphEdge::FusionEdge>& fusion_edges);
+    virtual void merge(const std::vector<DecodingGraphEdge::FusionEdge>& fusion_edges);
 
     int get_last_growth_steps() const override { return last_growth_steps_; }
 

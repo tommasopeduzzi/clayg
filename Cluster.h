@@ -31,6 +31,8 @@ private:
     std::vector<std::shared_ptr<DecodingGraphEdge>> m_edges;
     std::vector<BoundaryEdge> m_boundary;
 
+    int m_has_been_neutral_since = -1;
+
 public:
     explicit Cluster(std::shared_ptr<DecodingGraphNode> root);
 
@@ -75,6 +77,8 @@ public:
     void set_boundary(const std::vector<BoundaryEdge>& boundary) { m_boundary = boundary; }
 
     bool is_neutral(bool consider_virtual_nodes = true) const;
+    int has_been_neutral_since() const { return m_has_been_neutral_since; }
+    void set_has_been_neutral_since(int round) { m_has_been_neutral_since = round; }
 
     static bool all_clusters_are_neutral(std::vector<std::shared_ptr<Cluster>> clusters,
                                          bool consider_virtual_nodes = true);
