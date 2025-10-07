@@ -39,7 +39,7 @@ unordered_map<string, string> parse_args(int argc, char* argv[])
     if (args.find("p_step") == args.end()) args["p_step"] = "0.005";
     if (args.find("dump") == args.end()) args["dump"] = "false";
     if (args.find("runs") == args.end()) args["runs"] = "10000";
-    if (args.find("consider_idling") == args.end()) args["consider_idling"] = "false";
+    if (args.find("consider_idling") == args.end()) args["consider_idling"] = "0.0";
 
     if (args.size() < 6) // D, T, p_start, p_end, decoders, results
     {
@@ -147,7 +147,7 @@ int main(int argc, char* argv[])
     bool dump = string(args["dump"]) == "true";
     logger.set_dump_enabled(dump);
     int runs = stoi(args["runs"]);
-    bool consider_idling = args["consider_idling"] == "true";
+    double consider_idling = stod(args["consider_idling"]);
 
     // Parse decoders argument (comma-separated)
     vector<string> decoder_names;
@@ -291,20 +291,18 @@ int main(int argc, char* argv[])
                     decoding_results.considered_up_to_round
                 });
                 logical = compute_logical(logical, logical_edge_ids, decoding_results);
-                if (consider_idling)
+                if (consider_idling != 0.0)
                 {
                     int num_growth_steps = decoder->get_last_growth_steps();
                     if (num_growth_steps > 0)
                     {
+                        float p_idling = 1/2 * (1-exp(-(num_growth_steps/consider_idling)));
+                        auto idling_error_edge_ids = generate_errors(D, 1, p_idling, dis, gen);
                         auto idling_error_edges = vector<shared_ptr<DecodingGraphEdge>>{};
-                        for (int step = 0; step < num_growth_steps; step++)
+                        for (auto id : idling_error_edge_ids)
                         {
-                            auto new_error_ids = generate_errors(D, 1, p, dis, gen);
-                            for (auto id : new_error_ids)
-                            {
-                                auto edge = graph->edge(id).value();
-                                idling_error_edges.push_back(edge);
-                            }
+                            auto edge = graph->edge(id).value();
+                            idling_error_edges.push_back(edge);
                         }
                         logical = compute_logical(logical, logical_edge_ids, {
                             idling_error_edges,
@@ -329,7 +327,7 @@ int main(int argc, char* argv[])
         results.push_back({p, {}});
         for (const auto& decoder : decoders) {
             double error_rate = static_cast<double>(errors[decoder->decoder_name()]) / runs;
-            logger.log_results_entry(p, error_rate, runs, decoder->decoder_name());
+            logger.log_results_entry(p, error_rate, runs, consider_idling, decoder->decoder_name());
             logger.log_growth_steps(p, growth_steps[decoder->decoder_name()], decoder->decoder_name());
             results.back().second[decoder->decoder_name()] = error_rate;
         }

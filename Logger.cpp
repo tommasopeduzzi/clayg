@@ -159,11 +159,17 @@ int Logger::get_distance() const {
     return distance_;
 }
 
-void Logger::log_results_entry(double p, double value, int runs, const std::string& decoder_name) {
+void Logger::log_results_entry(double p, double value, int runs, float consider_idling, const std::string& decoder_name) {
     std::filesystem::create_directories(results_dir_);
     std::string filename;
     if (distance_ > 0) {
-        filename = results_dir_ + "/results/" + decoder_name + "_d=" + std::to_string(distance_) + ".txt";
+        if (consider_idling != 0.0) {
+            filename = results_dir_ + "/results/" + decoder_name + "_d=" + std::to_string(distance_) +
+                "_idling=" + std::to_string(consider_idling) + ".txt";
+        }
+        else {
+            filename = results_dir_ + "/results/" + decoder_name + "_d=" + std::to_string(distance_) + ".txt";
+        }
     } else {
         filename = results_dir_ + "/results/" + decoder_name + ".txt";
     }
