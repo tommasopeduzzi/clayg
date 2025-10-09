@@ -159,22 +159,22 @@ int Logger::get_distance() const {
     return distance_;
 }
 
-void Logger::log_results_entry(double p, double value, int runs, float consider_idling, const std::string& decoder_name) {
+void Logger::log_results_entry(double logical_error_rate, int runs, double p,  double idling_time_constant, const std::string& decoder_name) {
     std::filesystem::create_directories(results_dir_);
-    std::string filename;
+    std::string filename = results_dir_ + "/results/"+ decoder_name + "_";
     if (distance_ > 0) {
-        if (consider_idling != 0.0) {
-            filename = results_dir_ + "/results/" + decoder_name + "_d=" + std::to_string(distance_) +
-                "_idling=" + std::to_string(consider_idling) + ".txt";
-        }
-        else {
-            filename = results_dir_ + "/results/" + decoder_name + "_d=" + std::to_string(distance_) + ".txt";
-        }
-    } else {
-        filename = results_dir_ + "/results/" + decoder_name + ".txt";
+        filename += "d=" + std::to_string(distance_) + "_";
     }
+    if (idling_time_constant > 0.0)
+    {
+        filename += "idlingtimeconstant=" + std::to_string(idling_time_constant) + "_";
+    }
+    if (filename.back() == '_') {
+        filename.pop_back(); // remove trailing underscore
+    }
+    filename += ".txt";
     std::ostringstream line;
-    line << p << "\t" << value << "\t" << runs << "\n";
+    line << p << "\t" << logical_error_rate << "\t" << runs << "\n";
     write_to_file(filename, line.str(), true);
 }
 
