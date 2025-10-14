@@ -56,7 +56,7 @@ unordered_map<string, string> parse_args(int argc, char* argv[])
 
     for (auto step_key : {"p_step", "idling_time_constant_step"})
     {
-        if (string("*/+-").find(args[step_key][0]) == string::npos)
+        if (string("*/+-#").find(args[step_key][0]) == string::npos)
         {
             cerr << "Error: Invalid " << step_key << ". Must be a floating point number prefixed by +, -, *, or /.\n";
             exit(1);
@@ -204,9 +204,18 @@ void increment_by_step(double& variable, pair<char, double> step)
         variable -= step.second;
         break;
     case '*':
-    default:
         variable *= step.second;
         break;
+
+    case '#': // harmonic scaling (linear in 1/x)
+        {
+            double inv = 1.0 / variable;
+            inv += step.second;
+            variable = 1.0 / inv;
+        }
+        break;
+    default:
+        throw std::invalid_argument("Unknown step type");
     }
 }
 
