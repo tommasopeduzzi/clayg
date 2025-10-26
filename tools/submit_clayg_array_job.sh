@@ -1,49 +1,27 @@
 #!/bin/bash
 #SBATCH --job-name=clayg_array
-#SBATCH --output=slurm-%x-%A_%a.out
-#SBATCH --error=slurm-%x-%A_%a.err
-#SBATCH --time=12:00:00
+#SBATCH --output=stdout/slurm-%x-%A_%a.out
+#SBATCH --error=stderr/slurm-%x-%A_%a.err
+#SBATCH --time=28:00:00
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=2G
-#SBATCH --array=0-<N>  # Set to number of lines in params.txt minus 1
+#SBATCH --array=0-5 # Set to number of lines in params.txt minus 1
 
-CLAYG_EXEC="/../build/clayg"
 CWD="$(pwd)"
-BASE_DIR="$CWD/data/new_average_operations"
+CLAYG_EXEC="$CWD/../build/clayg"
 PARAM_FILE="$CWD/params.txt"
-DECODERS="sl_clayg,clayg,uf"
-RUNS=200000
 
 LINE=$(sed -n "$((SLURM_ARRAY_TASK_ID + 1))p" "$PARAM_FILE")
-read -r DIST MODE REST <<< "$LINE"
-
-# Generate output directory with timestamp
-mkdir -p "$BASE_DIR"
-next_id=$(find "$BASE_DIR" -maxdepth 1 -type d -printf "%f\n" | grep -E '^[0-9]+-' | sed 's/-.*//' | sort -n | tail -n1)
-if [[ -z "$next_id" ]]; then
-    next_id=1
-else
-    next_id=$((next_id + 1))
-fi
+read -r DECODERS DIST RUNS BASE_DIR P_START P_END P_STEP IDL_START IDL_END IDL_STEP <<< "$LINE"
+echo "$LINE"
 
 timestamp=$(date +%F_%H-%M-%S)
+OUTPUT_DIR="$CWD/../$BASE_DIR/${timestamp}_D${DIST}"
+mkdir -p "$OUTPUT_DIR"
 
-if [[ "$MODE" == "prob" ]]; then
-    P="$REST"
-    P_END=$(echo "$P * 1.5" | bc -l)
-    OUTPUT_DIR="$BASE_DIR/${next_id}-${timestamp}_D${DIST}_P${P}"
-    mkdir -p "$OUTPUT_DIR"
-    echo "[$SLURM_ARRAY_TASK_ID] MODE=LIST D=$DIST, P=$P -> $OUTPUT_DIR"
-    "$CLAYG_EXEC" "$DIST" "$DIST" "$P" "$P_END" "$DECODERS" "$OUTPUT_DIR" p_step="*2" dump=false runs=$RUNS
+echo "[$SLURM_ARRAY_TASK_ID] D=$DIST, (prob $P_START→$P_END $P_STEP) (idling $IDL_START→$IDL_END $IDL_STEP) -> $OUTPUT_DIR"
 
-elif [[ "$MODE" == "range" ]]; then
-    read -r P_START P_END P_STEP <<< "$REST"
-    OUTPUT_DIR="$BASE_DIR/${next_id}-${timestamp}_D${DIST}_Range"
-    mkdir -p "$OUTPUT_DIR"
-    echo "[$SLURM_ARRAY_TASK_ID] MODE=RANGE D=$DIST, [$P_START, $P_END] step $P_STEP -> $OUTPUT_DIR"
-    "$CLAYG_EXEC" "$DIST" "$DIST" "$P_START" "$P_END" "$DECODERS" "$OUTPUT_DIR" p_step="*${P_STEP}" dump=false runs=$RUNS
-
-else
-    echo "[$SLURM_ARRAY_TASK_ID] ERROR: Unknown mode '$MODE'"
-    exit 1
-fi
+"$CLAYG_EXEC" "$DIST" "$DIST" "$DECODERS" "$OUTPUT_DIR" \
+    --p_start "${P_START}" --p_end "${P_END}" --p_step "${P_STEP}" \
+    --idling_time_constant_start "$IDL_START" --idling_time_constant_end "$IDL_END" --idling_time_constant_step "$IDL_STEP" \
+    --dump false --runs "$RUNS"

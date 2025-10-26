@@ -1,0 +1,20 @@
+{
+  "Mode": "results",
+  "D": [6, 8, 10, 12, 14, 16],
+  "Decoders": {
+    "uf": {},
+    "clayg": {
+      "cluster_lifetime": [0.0, 0.25, 0.5 0.75, 1.0]
+    }
+  },
+  "Category": "test_new",
+  "Results Directory": "data/test_new",
+  "P Start": 0.005,
+  "P End": 0.01,
+  "P Step": "+0.005",
+  "Idling Time Constant Start": 0.005,
+  "Idling Time Constant End": 0.01,
+  "Idling Time Constant Step": "+0.005",
+  "Runs": 100,
+  "Dump": false
+}
