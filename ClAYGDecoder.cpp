@@ -11,6 +11,39 @@
 
 using namespace std;
 
+ClAYGDecoder::ClAYGDecoder(std::unordered_map<std::string, std::string> args)
+{
+    this->decoder_name_ = "clayg";
+
+    if (auto it = args.find("stop_early"); it != args.end()) {
+        this->set_stop_early(it->second == "true");
+        this->decoder_name_ += it->second == "true" ? "_stop_early" : "_no_stop_early";
+    }
+
+    if (auto it = args.find("growth_policy"); it != args.end()) {
+        string policy = it->second;
+        if (policy == "third") {
+            this->set_growth_policy([] (const DecodingGraphNode::Id start, const DecodingGraphNode::Id end) {
+                if (start.round == end.round) return 0.34;
+                if (start.round > end.round) return 1.0;
+                return 0.5;
+            });
+            this->decoder_name_ += "_third_growth";
+        } else if (policy == "faster_backwards") {
+            this->set_growth_policy([] (const DecodingGraphNode::Id start, const DecodingGraphNode::Id end) {
+                if (start.round > end.round) return 1.0;
+                return 0.5;
+            });
+            this->decoder_name_ += "_faster_backwards_growth";
+        }
+    }
+
+    if (auto it = args.find("cluster_lifetime"); it != args.end()) {
+        this->set_cluster_lifetime_factor(stod(it->second));
+        this->decoder_name_ += "_lifetime_" + it->second;
+    }
+}
+
 DecodingResult ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
 {
     vector<shared_ptr<DecodingGraphNode>> marked_nodes;
@@ -182,9 +215,8 @@ vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::clean(const shared_ptr<Decod
         }
 
         // Keep newly neutral clusters around.
-        // FIXME: find a better expression for this as a funciton of d
-        const int neutral_grace_period = (decoding_graph->d()-1)/2;
-        if (current_round_ - cluster->has_been_neutral_since() < neutral_grace_period)
+        const int cluster_lifetime = decoding_graph->d() * cluster_lifetime_factor_;
+        if (current_round_ - cluster->has_been_neutral_since() < cluster_lifetime)
         {
             new_clusters.push_back(move(cluster));
             continue;

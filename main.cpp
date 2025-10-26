@@ -13,101 +13,136 @@
 
 using namespace std;
 
-unordered_map<string, string> parse_args(int argc, char* argv[])
-{
+#include <bits/stdc++.h>
+using namespace std;
+
+struct ArgSpec {
+    string name;
+    string default_value;
+    function<void(const string&)> validator;
+};
+
+struct DecoderConfig {
+    string name;
     unordered_map<string, string> args;
-    vector<string> keys = {"D", "T", "decoders", "results"};
+};
 
-    for (int i = 1; i < argc; ++i)
-    {
-        string arg = argv[i];
-        size_t eq_pos = arg.find('=');
+vector<DecoderConfig> parse_decoder_list(const string& input) {
+    vector<DecoderConfig> decoders;
+    size_t pos = 0;
+    while (pos < input.size()) {
+        size_t start = pos;
+        size_t paren = input.find('(', start);
+        size_t comma = input.find(',', start);
+        DecoderConfig cfg;
 
-        if (eq_pos != string::npos)
-        {
-            string key = arg.substr(0, eq_pos);
-            string value = arg.substr(eq_pos + 1);
+        if (paren != string::npos && (comma == string::npos || paren < comma)) {
+            cfg.name = input.substr(start, paren - start);
+            size_t close = input.find(')', paren);
+            if (close == string::npos)
+                throw invalid_argument("Missing ')' in decoder list for: " + cfg.name);
+
+            string inside = input.substr(paren + 1, close - paren - 1);
+            stringstream ss(inside);
+            string kv;
+            while (getline(ss, kv, ',')) {
+                if (kv.empty()) continue;
+                size_t eq = kv.find('=');
+                if (eq == string::npos)
+                    throw invalid_argument("Invalid decoder arg in " + cfg.name + ": " + kv);
+                cfg.args[kv.substr(0, eq)] = kv.substr(eq + 1);
+            }
+            pos = close + 1;
+        } else {
+            size_t end = (comma == string::npos) ? input.size() : comma;
+            cfg.name = input.substr(start, end - start);
+            pos = end;
+        }
+
+        while (pos < input.size() && (input[pos] == ',' || isspace(input[pos])))
+            ++pos;
+
+        if (!cfg.name.empty())
+            decoders.push_back(cfg);
+    }
+    return decoders;
+}
+
+unordered_map<string, string> parse_args(int argc, char* argv[]) {
+    vector<ArgSpec> specs = {
+        {"D", "", [](const string& v){ stoi(v); }},
+        {"T", "", [](const string& v){ stoi(v); }},
+        {"decoders", "", [](const string& v){
+            if (v.empty()) throw invalid_argument("empty decoders");
+            parse_decoder_list(v);
+        }},
+        {"results", "", [](const string& v){ if (v.empty()) throw invalid_argument("empty results path"); }},
+        {"p_start", "0.005", [](const string& v){ stod(v); }},
+        {"p_end", "0.005", [](const string& v){ stod(v); }},
+        {"p_step", "+0.005", [](const string& v){
+            if (v.size() < 2 || string("+-*/").find(v[0]) == string::npos)
+                throw invalid_argument("must start with +, -, *, or /");
+            stod(v.substr(1));
+        }},
+        {"idling_time_constant_start", "0.0", [](const string& v){ stod(v); }},
+        {"idling_time_constant_end", "0.0", [](const string& v){ stod(v); }},
+        {"idling_time_constant_step", "+0.0", [](const string& v){
+            if (v.size() < 2 || string("+-*/").find(v[0]) == string::npos)
+                throw invalid_argument("must start with +, -, *, or /");
+            stod(v.substr(1));
+        }},
+        {"dump", "false", [](const string& v){
+            if (v != "true" && v != "false")
+                throw invalid_argument("must be true or false");
+        }},
+        {"runs", "10000", [](const string& v){ stoi(v); }},
+    };
+
+    unordered_set<string> known_keys;
+    for (auto& s : specs) known_keys.insert(s.name);
+
+    unordered_map<string, string> args;
+    vector<string> positional = {"D", "T", "decoders", "results"};
+    int pos_i = 0;
+
+    for (int i = 1; i < argc; ++i) {
+        string token = argv[i];
+
+        // Option-style argument
+        if (token.rfind("--", 0) == 0) {
+            string key = token.substr(2);
+            if (!known_keys.count(key)) {
+                cerr << "Unknown option: " << key << endl;
+                exit(1);
+            }
+
+            if (i + 1 >= argc) {
+                cerr << "Missing value for option: " << key << endl;
+                exit(1);
+            }
+
+            string value = argv[++i];
             args[key] = value;
         }
-        else if (i - 1 < keys.size())
-        {
-            args[keys[i - 1]] = arg;
-        }
-    }
-
-    // Set defaults
-    if (args.find("p_start") == args.end()) args["p_start"] = "0.005";
-    if (args.find("p_end") == args.end()) args["p_end"] = "0.005";
-    if (args.find("p_step") == args.end()) args["step"] = "+0.005";
-    if (args.find("idling_time_constant_start") == args.end()) args["idling_time_constant_start"] = "0.0";
-    if (args.find("idling_time_constant_end") == args.end()) args["idling_time_constant_end"] = "0.0";
-    if (args.find("idling_time_constant_end_step") == args.end()) args["step"] = "0";
-    if (args.find("dump") == args.end()) args["dump"] = "false";
-    if (args.find("runs") == args.end()) args["runs"] = "10000";
-
-
-    if (args.size() < 4) // D, T, decoders, results
-    {
-        cerr << "Error: Invalid number of arguments.\n";
-        cerr << "Usage: " << argv[0] << "D T decoders results [p_start] [p_end] [p_step] [idling_time_constant_start] "
-             << "[idling_time_constant_end] [idling_time_constant_step] [dump] [runs]\n";
-        exit(1);
-    }
-
-    for (auto step_key : {"p_step", "idling_time_constant_step"})
-    {
-        if (string("*/+-#").find(args[step_key][0]) == string::npos)
-        {
-            cerr << "Error: Invalid " << step_key << ". Must be a floating point number prefixed by +, -, *, or /.\n";
-            exit(1);
-        }
-        try
-        {
-            stod(args[step_key].substr(1));
-        }
-        catch (const invalid_argument& e)
-        {
-            cerr << "Error: Invalid argument " << step_key << ". Must be a floating point number prefixed by +, -, *, or /.\n";
+        // Positional arguments (D, T, decoders, results)
+        else if (pos_i < (int)positional.size()) {
+            args[positional[pos_i++]] = token;
+        } else {
+            cerr << "Unexpected argument: " << token << endl;
             exit(1);
         }
     }
 
-    for (auto float_key : {"p_start", "p_end", "idling_time_constant_start", "idling_time_constant_end"})
-    {
-        try
-        {
-            stod(args[float_key]);
-        }
-        catch (const invalid_argument& e)
-        {
-            cerr << "Error: Invalid argument " << float_key << ". Must be a floating point number.\n";
-            exit(1);
-        }
-    }
+    // Apply defaults & validate
+    for (const auto& spec : specs) {
+        if (args.find(spec.name) == args.end())
+            args[spec.name] = spec.default_value;
 
-    for (auto int_key : {"D", "T", "runs"})
-    {
-        try
-        {
-            stoi(args[int_key]);
-        }
-        catch (const invalid_argument& e)
-        {
-            cerr << "Error: Invalid argument " << int_key << ". Must be an integer.\n";
-            exit(1);
-        }
-        if (stoi(args[int_key]) <= 0)
-        {
-            cerr << "Error: Invalid argument " << int_key << ". Must be a positive integer.\n";
-            exit(1);
-        }
-    }
-
-    for (auto bool_key : {"dump"})
-    {
-        if (args[bool_key] != "true" && args[bool_key] != "false")
-        {
-            cerr << "Error: Invalid argument " << bool_key << ". Must be true or false.\n";
+        try {
+            spec.validator(args[spec.name]);
+        } catch (const invalid_argument& e) {
+            cerr << "Invalid argument for " << spec.name << ": " << args[spec.name]
+                 << "\nReason: " << e.what() << endl;
             exit(1);
         }
     }
@@ -237,10 +272,10 @@ int main(int argc, char* argv[])
     int T = stoi(args["T"]);
     double p_start = stod(args["p_start"]);
     double p_end = stod(args["p_end"]);
-    pair<char, double> p_step = {args["p_step"][0], stod(args["p_step"].substr(1))};
+    pair p_step = {args["p_step"][0], stod(args["p_step"].substr(1))};
     double idling_time_constant_start = stod(args["idling_time_constant_start"]);
     double idling_time_constant_end = stod(args["idling_time_constant_end"]);
-    pair<char, double> idling_time_constant_step = {args["idling_time_constant_step"][0], stod(args["idling_time_constant_step"].substr(1))};
+    pair idling_time_constant_step = {args["idling_time_constant_step"][0], stod(args["idling_time_constant_step"].substr(1))};
     string results_file_path = args["results"];
     bool dump = string(args["dump"]) == "true";
     logger.set_dump_enabled(dump);
@@ -249,62 +284,19 @@ int main(int argc, char* argv[])
     // Parse decoders argument (comma-separated)
     vector<string> decoder_names;
     string decoders_arg = args["decoders"];
-    size_t start = 0, end = 0;
-    while ((end = decoders_arg.find(',', start)) != string::npos) {
-        decoder_names.push_back(decoders_arg.substr(start, end - start));
-        start = end + 1;
-    }
-    decoder_names.push_back(decoders_arg.substr(start));
+    auto parsed_decoders = parse_decoder_list(decoders_arg);
 
     // Instantiate decoders
     vector<shared_ptr<Decoder>> decoders;
-    for (const auto& name : decoder_names) {
-        if (name == "uf" || name == "unionfind") {
+    for (auto& [decoder_name, decoder_args] : parsed_decoders) {
+        if (decoder_name == "uf" || decoder_name == "unionfind") {
             decoders.push_back(make_shared<UnionFindDecoder>());
-        } else if (name == "clayg") {
-            decoders.push_back(make_shared<ClAYGDecoder>());
-        } else if (name == "single_layer_clayg" || name == "sl_clayg") {
-            decoders.push_back(make_shared<SingleLayerClAYGDecoder>());
-        } else if (name == "clayg_stop_early") {
-            auto decoder = make_shared<ClAYGDecoder>();
-            decoder->set_stop_early(true);
-            decoder->set_decoder_name("clayg_stop_early");
-            decoders.push_back(decoder);
-        } else if (name == "clayg_third_growth") {
-            auto decoder = make_shared<ClAYGDecoder>();
-            decoder->set_growth_policy([] (const DecodingGraphNode::Id start, const DecodingGraphNode::Id end)
-            {
-                if (start.round == end.round)
-                    return 0.34;
-                if (start.round > end.round)
-                    return 1.0;
-                return 0.5;
-            });
-            decoder->set_decoder_name("clayg_third_growth");
-            decoders.push_back(decoder);
-        }
-        else if (name == "clayg_faster_backwards_growth") {
-            auto decoder = make_shared<ClAYGDecoder>();
-            decoder->set_growth_policy([] (const DecodingGraphNode::Id start, const DecodingGraphNode::Id end)
-            {
-                if (start.round > end.round)
-                    return 1.0;
-                return 0.5;
-            });
-            decoder->set_decoder_name("clayg_faster_backwards_growth");
-            decoders.push_back(decoder);
-        } else if (name == "sl_clayg_two_growth_rounds") {
-            auto decoder = make_shared<SingleLayerClAYGDecoder>();
-            decoder->set_growth_rounds(2);
-            decoder->set_decoder_name("sl_clayg_two_growth_rounds");
-            decoders.push_back(decoder);
-        } else if (name == "sl_clayg_stop_early") {
-            auto decoder = make_shared<SingleLayerClAYGDecoder>();
-            decoder->set_decoder_name("sl_clayg_stop_early");
-            decoder->set_stop_early(true);
-            decoders.push_back(decoder);
+        } else if (decoder_name == "clayg") {
+            decoders.push_back(make_shared<ClAYGDecoder>(decoder_args));
+        } else if (decoder_name == "single_layer_clayg" || decoder_name == "sl_clayg") {
+            decoders.push_back(make_shared<SingleLayerClAYGDecoder>(decoder_args));
         } else {
-            cerr << "Unknown decoder: " << name << endl;
+            cerr << "Unknown decoder: " << decoder_name << endl;
             exit(1);
         }
     }

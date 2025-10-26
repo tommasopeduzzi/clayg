@@ -9,6 +9,8 @@
 #include "UnionFindDecoder.h"
 #include "Decoder.h"
 
+#include <utility>
+
 // ClAYGDecoder inherits from UnionFind
 // It owns the clusters and the graph, but not its constituents
 class ClAYGDecoder : public virtual UnionFindDecoder {
@@ -16,13 +18,10 @@ protected:
     int growth_rounds_ = 1;
     bool stop_early_ = false;
     int current_round_ = 0;
+    double cluster_lifetime_factor_ = 0;
     std::shared_ptr<DecodingGraph> decoding_graph_;
 public:
-    explicit ClAYGDecoder(const int growth_rounds = 1, const bool stop_early = false)
-        : growth_rounds_(growth_rounds), stop_early_(stop_early)
-    {
-        decoder_name_ = "clayg";
-    }
+    explicit ClAYGDecoder(std::unordered_map<std::string, std::string> args = {});
 
     DecodingResult decode(std::shared_ptr<DecodingGraph> graph) override;
 
@@ -35,16 +34,17 @@ public:
     void set_growth_rounds(const int growth_rounds) { growth_rounds_ = growth_rounds; }
 
     void set_stop_early(const bool stop_early) { stop_early_ = stop_early; }
+
+    void set_cluster_lifetime_factor(const double life_time) { cluster_lifetime_factor_ = life_time; }
 };
 
 class SingleLayerClAYGDecoder : public virtual ClAYGDecoder
 {
-private:
 public:
-    explicit SingleLayerClAYGDecoder(const int growth_rounds = 1, const bool stop_early = false)
-        : ClAYGDecoder(growth_rounds, stop_early)
+    explicit SingleLayerClAYGDecoder(std::unordered_map<std::string, std::string> args = {})
+        : ClAYGDecoder(std::move(args))
     {
-        decoder_name_ = "sl_clayg";
+        decoder_name_ = "sl_" + decoder_name_;
         decoding_graph_ = DecodingGraph::rotated_surface_code(2, 2);
     }
 
