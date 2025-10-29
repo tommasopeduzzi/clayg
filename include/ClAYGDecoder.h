@@ -5,11 +5,10 @@
 #ifndef CLAYG_CLAYGDECODER_H
 #define CLAYG_CLAYGDECODER_H
 
+#include <utility>
 
 #include "UnionFindDecoder.h"
 #include "Decoder.h"
-
-#include <utility>
 
 // ClAYGDecoder inherits from UnionFind
 // It owns the clusters and the graph, but not its constituents

@@ -1,11 +1,12 @@
-#include "Logger.h"
-#include "DecodingGraph.h"
-#include "Cluster.h"
 #include <fstream>
 #include <filesystem>
 #include <iostream>
 #include <sstream>
 #include <chrono>
+
+#include "Logger.h"
+#include "DecodingGraph.h"
+#include "Cluster.h"
 
 Logger logger;
 

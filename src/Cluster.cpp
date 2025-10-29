@@ -2,7 +2,10 @@
 // Created by tommasopeduzzi on 1/12/24.
 //
 
+#include <memory>
+
 #include "Cluster.h"
+#include "DecodingGraph.h"
 
 using namespace std;
 

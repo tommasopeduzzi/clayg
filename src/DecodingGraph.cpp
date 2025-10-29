@@ -5,9 +5,6 @@
 #include "DecodingGraph.h"
 #include "Logger.h"
 
-#include <fstream>
-#include <iostream>
-
 using namespace std;
 
 shared_ptr<DecodingGraph> DecodingGraph::surface_code(int D, int T) {

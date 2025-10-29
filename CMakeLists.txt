@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.24)
 project(clayg)
 
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Set default build type to Release if not specified
 if(NOT CMAKE_BUILD_TYPE)
@@ -11,13 +12,22 @@ endif()
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-add_executable(clayg
-    main.cpp
-    DecodingGraph.cpp DecodingGraph.h
-    Cluster.cpp Cluster.h
-    UnionFindDecoder.cpp UnionFindDecoder.h
-    PeelingDecoder.cpp PeelingDecoder.h
-    ClAYGDecoder.cpp ClAYGDecoder.h
-    Decoder.cpp Decoder.h
-    Logger.cpp Logger.h
+# --- Core library (shared code) ---
+add_library(clayg_lib
+        src/DecodingGraph.cpp
+        src/Cluster.cpp
+        src/UnionFindDecoder.cpp
+        src/PeelingDecoder.cpp
+        src/ClAYGDecoder.cpp
+        src/Decoder.cpp
+        src/Logger.cpp
 )
+
+target_include_directories(clayg_lib
+        PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+# --- Main executable ---
+add_executable(clayg src/main.cpp)
+target_link_libraries(clayg PRIVATE clayg_lib)

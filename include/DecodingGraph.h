@@ -12,6 +12,7 @@
 #include <map>
 #include <set>
 #include <cassert>
+
 #include "Cluster.h"
 
 class Cluster;

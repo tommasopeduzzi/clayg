@@ -5,10 +5,8 @@
 #ifndef CLAYG_CLUSTER_H
 #define CLAYG_CLUSTER_H
 
-#include <utility>
 #include <vector>
 #include <algorithm>
-#include "DecodingGraph.h"
 
 class DecodingGraphNode;
 class DecodingGraphEdge;

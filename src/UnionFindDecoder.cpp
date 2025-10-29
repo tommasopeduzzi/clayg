@@ -3,11 +3,10 @@
 //
 
 #include <algorithm>
-#include <iostream>
-#include "UnionFindDecoder.h"
-#include "Logger.h"
 
-#include <fstream>
+#include "UnionFindDecoder.h"
+#include "PeelingDecoder.h"
+#include "Logger.h"
 
 using namespace std;
 

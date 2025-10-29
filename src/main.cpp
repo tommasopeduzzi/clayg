@@ -5,15 +5,13 @@
 #include <random>
 #include <regex>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "DecodingGraph.h"
 #include "UnionFindDecoder.h"
 #include "ClAYGDecoder.h"
 #include "Logger.h"
 
-using namespace std;
-
-#include <bits/stdc++.h>
 using namespace std;
 
 struct ArgSpec {

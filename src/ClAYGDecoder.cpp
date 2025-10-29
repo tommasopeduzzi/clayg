@@ -2,12 +2,11 @@
 // Created by tommasopeduzzi on 1/28/24.
 //
 
-#include "ClAYGDecoder.h"
-
 #include <cmath>
-#include <iostream>
 
+#include "ClAYGDecoder.h"
 #include "Logger.h"
+#include "PeelingDecoder.h"
 
 using namespace std;
 

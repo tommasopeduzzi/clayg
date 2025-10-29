@@ -9,7 +9,6 @@
 #include <functional>
 
 #include "DecodingGraph.h"
-#include "PeelingDecoder.h"
 #include "Decoder.h"
 
 class UnionFindDecoder : public virtual Decoder
