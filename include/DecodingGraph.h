@@ -158,6 +158,7 @@ public:
 
     static std::shared_ptr<DecodingGraph> surface_code(int D, int T);
     static std::shared_ptr<DecodingGraph> rotated_surface_code(int D, int T);
+    static std::shared_ptr<DecodingGraph> repetition_code(int D, int T);
 
     [[nodiscard]] int ancilla_count_per_layer() const { return m_ancilla_count_per_layer; }
 

@@ -67,12 +67,9 @@ DecodingResult ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
     const int rounds = graph->t();
     if (!decoding_graph_ || decoding_graph_->d() != graph->d())
     {
-        decoding_graph_ = DecodingGraph::rotated_surface_code(graph->d(), graph->t());
+        decoding_graph_ = make_shared<DecodingGraph>(*graph);
     }
-    else
-    {
-        decoding_graph_->reset(); // Reset the graph to its initial state
-    }
+    decoding_graph_->reset();
     vector<shared_ptr<DecodingGraphEdge>> error_edges;
 
     m_clusters = {};
@@ -86,16 +83,10 @@ DecodingResult ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
         vector<shared_ptr<DecodingGraphNode>> nodes;
         for (const auto& node : marked_nodes)
         {
-            if (node->id().round == current_round_ && node->marked())
+            if (node->id().round == current_round_)
             {
-                nodes.push_back(node);
+                add(decoding_graph_, node);
             }
-        }
-        int added_nodes = 0;
-        for (const auto& node : nodes)
-        {
-            add(decoding_graph_, node);
-            added_nodes++;
         }
         auto new_error_edges = clean(decoding_graph_);
         logger.log_clusters(m_clusters, decoder_name_, step++);

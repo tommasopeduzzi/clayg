@@ -353,7 +353,7 @@ int main(int argc, char* argv[])
 
         for (int i = 0; i < runs; i++)
         {
-            logger.prepare_run_dir();
+            logger.prepare_dump_dir();
             error_edge_ids = generate_errors(D, T, p, dis, gen);
             logger.log_errors(error_edge_ids);
             logger.log_graph(graph->edges());

@@ -179,6 +179,59 @@ shared_ptr<DecodingGraph> DecodingGraph::rotated_surface_code(int D, int T) {
     return graph;
 }
 
+std::shared_ptr<DecodingGraph> DecodingGraph::repetition_code(int D, int T)
+{
+    auto graph = make_shared<DecodingGraph>();
+
+    graph->m_ancilla_count_per_layer = D;
+    graph->D = D;
+    graph->T = T;
+
+    auto left_boundary_node = make_shared<DecodingGraphNode>(DecodingGraphNode::Id{DecodingGraphNode::VIRTUAL, 0,0});
+    auto right_boundary_node = make_shared<DecodingGraphNode>(DecodingGraphNode::Id{DecodingGraphNode::VIRTUAL, 0,1});
+    graph->addNode(left_boundary_node);
+    graph->addNode(right_boundary_node);
+
+    for (int round = 0; round < T; round++)
+    {
+        for (int x = 0; x < D; x++)
+        {
+            auto node = make_shared<DecodingGraphNode>(DecodingGraphNode::Id {DecodingGraphNode::ANCILLA, round, x});
+            graph->addNode(node);
+            shared_ptr<DecodingGraphNode> other_node;
+            if (x == 0)
+            {
+                other_node = left_boundary_node;
+            }
+            else
+            {
+                other_node = graph->node({DecodingGraphNode::Type::ANCILLA, round, x-1}).value();
+            }
+            graph->addEdge(make_shared<DecodingGraphEdge>(
+                DecodingGraphEdge::Id {DecodingGraphEdge::Type::NORMAL, round, x},
+                make_pair(
+                    other_node,
+                    node)));
+
+            // connect to previous round
+            if (round == 0)
+                continue;
+
+            auto previous_round = graph->node({DecodingGraphNode::ANCILLA, round-1, x}).value();
+            graph->addEdge(make_shared<DecodingGraphEdge>(
+                DecodingGraphEdge::Id{DecodingGraphEdge::Type::MEASUREMENT, round, x},
+                make_pair(node,previous_round)));
+        }
+
+        auto rightmost_node = graph->node({DecodingGraphNode::Type::ANCILLA, round, D-1}).value();
+        graph->addEdge(make_shared<DecodingGraphEdge>(
+                DecodingGraphEdge::Id {DecodingGraphEdge::Type::NORMAL, round, D+1},
+                make_pair(rightmost_node, right_boundary_node)));
+    }
+
+    return graph;
+}
+
 optional<shared_ptr<DecodingGraphNode>> DecodingGraph::node(const DecodingGraphNode::Id id) {
     if (id.type == DecodingGraphNode::Type::VIRTUAL) {
         return m_virtual_nodes[id.id];

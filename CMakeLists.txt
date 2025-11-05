@@ -31,3 +31,8 @@ target_include_directories(clayg_lib
 # --- Main executable ---
 add_executable(clayg src/main.cpp)
 target_link_libraries(clayg PRIVATE clayg_lib)
+
+# -- Diagram Data Generator --
+add_executable(diagram_data_generator tools/diagram_data_generator.cpp
+        tools/diagram_data_generator.cpp)
+target_link_libraries(diagram_data_generator PRIVATE clayg_lib)

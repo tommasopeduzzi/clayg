@@ -99,7 +99,7 @@ def debounce(wait):
 
 
 class GraphVisualizer3D:
-    def __init__(self, graph_file, errors_file, clusters_dir=None, corrections_file=None):
+    def __init__(self, graph_file, errors_file, code, clusters_dir=None, corrections_file=None):
         self.graph_file = graph_file
         self.errors_file = errors_file
         self.clusters_dir = clusters_dir
@@ -152,7 +152,7 @@ class GraphVisualizer3D:
         self.load_corrections()
         if self.clusters_dir:
             self.load_clusters()
-        self.compute_layout()
+        self.compute_layout(code)
         self.create_artists()
         self.draw_graph()
 
@@ -269,7 +269,7 @@ class GraphVisualizer3D:
         if steps:
             self.current_cluster_step = steps[0]
 
-    def compute_layout(self):
+    def compute_layout(self, code):
         """Compute positions and colors for all nodes using the provided logic."""
         parsed_nodes = []
         for node in self.node_list:
@@ -293,29 +293,48 @@ class GraphVisualizer3D:
                     virtual_edge_count += 1
             except Exception:
                 continue
-        distance = virtual_edge_count ** 0.5
-        nodes_per_layer = math.floor(distance / 2) + 1  if distance > 0 else 1
-
-        for node in self.node_list:
-            try:
-                t, r, i = self.parse_node_str(node)
-            except Exception:
-                continue
-            color = "red" if t == "Ancilla" else "blue"
-            self.node_colors[node] = color
-            if t == "Virtual":
-                if i == 0:
-                    x = nodes_per_layer / 2 - 0.5
-                    y = 0
+        
+        if code == "rotated_surface_code":
+            distance = virtual_edge_count ** 0.5
+            nodes_per_layer = math.floor(distance / 2) + 1  if distance > 0 else 1
+            for node in self.node_list:
+                try:
+                    t, r, i = self.parse_node_str(node)
+                except Exception:
+                    continue
+                color = "red" if t == "Ancilla" else "blue"
+                self.node_colors[node] = color
+                if t == "Virtual":
+                    if i == 0:
+                        x = nodes_per_layer / 2 - 0.5
+                        y = 0
+                    else:
+                        x = nodes_per_layer / 2 - 0.5
+                        y = distance - 0.5
+                    z = (rounds - 1) / 2
                 else:
-                    x = nodes_per_layer / 2 - 0.5
-                    y = distance - 0.5
-                z = (rounds - 1) / 2
-            else:
-                x = (i % nodes_per_layer) - ((i // nodes_per_layer) % 2) * 0.5
-                y = (i // nodes_per_layer) + 1
-                z = r
-            self.pos[node] = (x * 3, y * 3, z)
+                    x = (i % nodes_per_layer) - ((i // nodes_per_layer) % 2) * 0.5
+                    y = (i // nodes_per_layer) + 1
+                    z = r
+                self.pos[node] = (x * 3, y * 3, z)
+        elif code == "repetition_code":
+            distance = len(parsed_nodes) ** 0.5
+            for node in self.node_list:
+                try:
+                    t, r, i = self.parse_node_str(node)
+                except Exception:
+                    continue
+                color = "red" if t == "Ancilla" else "blue"
+                self.node_colors[node] = color
+                if t == "Virtual":
+                    y = -2 if i == 0 else distance + 1
+                    x = 1
+                    z = (rounds - 1) / 2
+                else:
+                    y = i
+                    x = 1
+                    z = r
+                self.pos[node] = (x * 3, y * 3, z)
 
     def create_artists(self):
         """Create initial scatter and edge collections using dummy empty arrays."""
@@ -579,6 +598,7 @@ def main():
     )
     parser.add_argument('directory', help='Directory with runs.')
     parser.add_argument('run_id', help='Run to visualize.')
+    parser.add_argument('code', help='Code type (e.g., surface_code)')
     parser.add_argument('--graph_file', help='Path to the graph file')
     parser.add_argument('--errors_file', help='Path to the errors file')
     parser.add_argument('--decoder', help='Decoder for which to show clustering.')
@@ -596,7 +616,7 @@ def main():
         if not args.corrections_file:
             args.corrections_file = f"{args.directory}/{args.run_id}/{args.decoder}/corrections.txt"
 
-    visualizer = GraphVisualizer3D(args.graph_file, args.errors_file, clusters_dir=args.clusters,
+    visualizer = GraphVisualizer3D(args.graph_file, args.errors_file, args.code, clusters_dir=args.clusters,
                                    corrections_file=args.corrections_file)
 
     # Create check buttons.

@@ -44,7 +44,8 @@ public:
         : ClAYGDecoder(std::move(args))
     {
         decoder_name_ = "sl_" + decoder_name_;
-        decoding_graph_ = DecodingGraph::rotated_surface_code(2, 2);
+        // FIXME: Should be optional!
+        decoding_graph_ = nullptr;
     }
 
     DecodingResult decode(std::shared_ptr<DecodingGraph> graph) override;

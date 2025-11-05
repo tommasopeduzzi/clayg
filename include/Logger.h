@@ -30,11 +30,15 @@ public:
     void log_growth_steps(double p, const std::map<double, int>& frequencies, const std::string& decoder_name);
     void prepare_results_file(const std::string& decoder_name);
     void prepare_steps_file(const std::string& decoder_name);
-    void prepare_run_dir() const;
+    void prepare_dump_dir() const;
 
     // Dump flag management
     void set_dump_enabled(bool enabled);
     bool is_dump_enabled() const;
+
+    // Dump dir management
+    void set_dump_dir(const std::string& dump_dir);
+    std::string get_dump_dir();
 
     // Run ID management
     void set_run_id(int id);
@@ -58,6 +62,7 @@ public:
 private:
     bool dump_enabled = false;
     int run_id = 0;
+    std::string dump_dir_ = "data/runs";
     std::string results_dir_ = "data/results";
     int distance_ = -1;
 };
