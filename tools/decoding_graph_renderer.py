@@ -80,8 +80,8 @@ import networkx as nx
 import numpy as np
 from matplotlib.colors import to_rgba
 from matplotlib.widgets import CheckButtons, Slider, Button
-from mpl_toolkits.mplot3d.art3d import Line3DCollection
-
+from mpl_toolkits.mplot3d.art3d import Line3DCollection, Poly3DCollection
+from PIL import Image, ImageDraw
 
 def debounce(wait):
     def decorator(fn):
@@ -99,19 +99,20 @@ def debounce(wait):
 
 
 class GraphVisualizer3D:
-    def __init__(self, graph_file, errors_file, code, clusters_dir=None, corrections_file=None):
+    def __init__(self, graph_file, errors_file, step_dir=None, corrections_file=None):
         self.graph_file = graph_file
         self.errors_file = errors_file
-        self.clusters_dir = clusters_dir
+        self.step_dir = step_dir
         self.corrections_file = corrections_file
 
         # Data structures for the graph.
+        self.code = "rotated_surface_code"
         self.G = nx.MultiGraph()
         self.error_edges = set()
         self.correction_edges = set()
-        self.clusters = {}
-        self.cluster_steps = []
-        self.current_cluster_step = None
+        self.step_data = {}
+        self.decoding_steps = []
+        self.current_decoding_step = None
 
         # Toggle flags.
         self.show_nodes = True
@@ -120,21 +121,44 @@ class GraphVisualizer3D:
         self.show_edge_labels = False
         self.show_errors = True
         self.show_corrections = True
-        self.show_clusters = True if clusters_dir else False
+        self.show_steps = True if step_dir else False
         self.single_layer_enabled = False
         self.selected_layer = 0
+        
+        # Colors 
+        self.node_color_palette = {
+            "Ancilla": "black",
+            "Virtual": "blue",
+            "Marked": "red"
+        }
+        self.edge_colors_palette = {
+            "normal": "black",
+            "error": "red",
+            "correction": "green",
+            "cluster": [
+                (1.0, 0.6, 0.2, 0.8),
+                (1.0, 0.4, 0.1, 0.8),
+                (1.0, 0.5, 0.3, 0.8),
+                (1.0, 0.3, 0.2, 0.8),
+                (1.0, 0.6, 0.4, 0.8),
+                (1.0, 0.5, 0.1, 0.8),
+                (1.0, 0.4, 0.3, 0.8),
+            ]
+        }
+        self.current_round_color = 'lightgray'
 
         # Cached computed layout: node -> (x,y,z) and node colors.
         self.pos = {}
         self.node_colors = {}
         self.node_list = []
+        self.marked_nodes = set()
 
         # Artist handles.
         self.node_scatter = None
         self.normal_edge_collection = None
         self.error_edge_collection = None
         self.correction_edge_collection = None
-        self.cluster_edge_collection = None
+        self.cluster_edge_collections = None
         self.node_texts = []
         self.edge_texts = []  # For edge labels.
 
@@ -143,16 +167,15 @@ class GraphVisualizer3D:
 
         # Create figure and 3D axis.
         self.fig = plt.figure(figsize=(8, 6))
-        self.ax = self.fig.add_subplot(111, projection='3d')
+        self.ax = self.fig.add_subplot(111, projection='3d', computed_zorder=False)
         plt.subplots_adjust(left=0.3, bottom=0.15)
 
         # Load files, compute layout, and create artists.
         self.load_graph()
         self.load_errors()
         self.load_corrections()
-        if self.clusters_dir:
-            self.load_clusters()
-        self.compute_layout(code)
+        self.load_steps()
+        self.compute_layout()
         self.create_artists()
         self.draw_graph()
 
@@ -162,6 +185,8 @@ class GraphVisualizer3D:
             raise ValueError(f"Invalid node string format: {node_str}")
         type_code = parts[0]
         node_type = "Ancilla" if type_code == "0" else "Virtual" if type_code == "1" else type_code
+        if node_type == "Ancilla" and node_str in self.marked_nodes:
+            node_type = "Marked"
         try:
             round_ = int(parts[1])
             id_ = int(parts[2])
@@ -185,7 +210,12 @@ class GraphVisualizer3D:
     def load_graph(self):
         try:
             with open(self.graph_file, 'r') as f:
-                for line in f:
+                # If first line is not of type "...,...,...", pop it off
+                lines = f.readlines()
+                if lines and not re.match(r'^[^,]+,[^,]+,[^,]+$', lines[0].strip()):
+                    self.code = lines[0].strip()
+                    lines = lines[1:]
+                for line in lines:
                     line = line.strip()
                     if not line:
                         continue
@@ -197,7 +227,7 @@ class GraphVisualizer3D:
                     edge_label = parts[2].strip()
                     self.G.add_node(node1)
                     self.G.add_node(node2)
-                    self.G.add_edge(node1, node2, label=edge_label)
+                    self.G.add_edge(node1, node2, label=edge_label) 
         except Exception as e:
             print(f"Error reading graph file: {e}")
             sys.exit(1)
@@ -208,11 +238,22 @@ class GraphVisualizer3D:
             with open(self.errors_file, 'r') as f:
                 for line in f:
                     line = line.strip()
-                    if line:
-                        self.error_edges.add(line)
+                    if not line:
+                        continue
+                    self.error_edges.add(line)
         except Exception as e:
             print(f"Error reading errors file: {e}")
             sys.exit(1)
+        for u, v, data in self.G.edges(data=True):
+            if data.get('label', '') in self.error_edges:
+                if u in self.marked_nodes:
+                    self.marked_nodes.remove(u)
+                else:
+                    self.marked_nodes.add(u)
+                if v in self.marked_nodes:
+                    self.marked_nodes.remove(v)
+                else:
+                    self.marked_nodes.add(v)
 
     def load_corrections(self):
         if self.corrections_file is None:
@@ -227,28 +268,35 @@ class GraphVisualizer3D:
             print(f"Error reading corrections file: {e}")
             sys.exit(1)
 
-    def load_clusters(self):
+    def load_steps(self):
+        print(self.step_dir)
+        if self.step_dir is None:
+            return
         try:
-            files = [f for f in os.listdir(self.clusters_dir) if f.endswith('.txt')]
+            files = [f for f in os.listdir(self.step_dir) if f.endswith('.txt')]
         except Exception as e:
-            print(f"Error reading clusters directory: {e}")
+            print(f"Error reading steps directory: {e}")
             sys.exit(1)
         steps = []
         for filename in files:
-            re_match = re.search(r'clusters_step_(\d+)\.txt', filename)
+            re_match = re.search(r'decoding_step_(\d+)\.txt', filename)
             step = int(re_match.group(1)) if re_match else None
             if step is not None and step >= 0:
                 steps.append(step)
         steps.sort()
-        self.cluster_steps = steps
+        self.decoding_steps = steps
         for step in steps:
-            cluster_file = os.path.join(self.clusters_dir, f"clusters_step_{step}.txt")
+            step_file = os.path.join(self.step_dir, f"decoding_step_{step}.txt")
+            step_round = -1
             step_clusters = []
             try:
-                with open(cluster_file, 'r') as f:
+                with open(step_file, 'r') as f:
                     for line in f:
                         line = line.strip()
                         if not line:
+                            continue
+                        if line.startswith('current_round='):
+                            step_round = int(line.split('=')[1].strip())
                             continue
                         parts = line.split(',')
                         if len(parts) != 4:
@@ -263,13 +311,13 @@ class GraphVisualizer3D:
                             'growth': growth,
                             'cluster_id': cluster_id
                         })
-                self.clusters[step] = step_clusters
+                self.step_data[step] = (step_round, step_clusters)
             except Exception as e:
-                print(f"Error reading cluster file {cluster_file}: {e}")
+                print(f"Error reading decoding step file {step_file}: {e}")
         if steps:
-            self.current_cluster_step = steps[0]
+            self.current_decoding_step = steps[0]
 
-    def compute_layout(self, code):
+    def compute_layout(self):
         """Compute positions and colors for all nodes using the provided logic."""
         parsed_nodes = []
         for node in self.node_list:
@@ -294,7 +342,7 @@ class GraphVisualizer3D:
             except Exception:
                 continue
         
-        if code == "rotated_surface_code":
+        if self.code == "rotated_surface_code":
             distance = virtual_edge_count ** 0.5
             nodes_per_layer = math.floor(distance / 2) + 1  if distance > 0 else 1
             for node in self.node_list:
@@ -302,8 +350,7 @@ class GraphVisualizer3D:
                     t, r, i = self.parse_node_str(node)
                 except Exception:
                     continue
-                color = "red" if t == "Ancilla" else "blue"
-                self.node_colors[node] = color
+                self.node_colors[node] = self.node_color_palette[t]
                 if t == "Virtual":
                     if i == 0:
                         x = nodes_per_layer / 2 - 0.5
@@ -317,15 +364,14 @@ class GraphVisualizer3D:
                     y = (i // nodes_per_layer) + 1
                     z = r
                 self.pos[node] = (x * 3, y * 3, z)
-        elif code == "repetition_code":
+        elif self.code == "repetition_code":
             distance = len(parsed_nodes) ** 0.5
             for node in self.node_list:
                 try:
                     t, r, i = self.parse_node_str(node)
                 except Exception:
                     continue
-                color = "red" if t == "Ancilla" else "blue"
-                self.node_colors[node] = color
+                self.node_colors[node] = self.node_color_palette[t]
                 if t == "Virtual":
                     y = -2 if i == 0 else distance + 1
                     x = 1
@@ -335,19 +381,22 @@ class GraphVisualizer3D:
                     x = 1
                     z = r
                 self.pos[node] = (x * 3, y * 3, z)
+        else: 
+            print(f"Unknown code type: {self.code}. Cannot compute layout.")
+            sys.exit(1)
 
     def create_artists(self):
         """Create initial scatter and edge collections using dummy empty arrays."""
         self.node_scatter = self.ax.scatter([], [], [], s=100, alpha=0.8)
         dummy_seg = np.empty((0, 2, 3))
-        self.normal_edge_collection = Line3DCollection(dummy_seg, colors='black', linewidths=1)
+        self.normal_edge_collection = Line3DCollection(dummy_seg, colors=self.edge_colors_palette["normal"], linewidths=1, zorder=-2)
         self.ax.add_collection3d(self.normal_edge_collection)
-        self.error_edge_collection = Line3DCollection(dummy_seg, colors='red', linewidths=2.5)
+        self.error_edge_collection = Line3DCollection(dummy_seg, colors=self.edge_colors_palette["error"], linewidths=2.5)
         self.ax.add_collection3d(self.error_edge_collection)
-        self.correction_edge_collection = Line3DCollection(dummy_seg, colors='green', linewidths=1.5)
+        self.correction_edge_collection = Line3DCollection(dummy_seg, colors=self.edge_colors_palette["correction"], linewidths=1.5)
         self.ax.add_collection3d(self.correction_edge_collection)
-        self.cluster_edge_collection = Line3DCollection(dummy_seg, colors='gray', linewidths=3, linestyles='dashed')
-        self.ax.add_collection3d(self.cluster_edge_collection)
+        self.cluster_edge_collections = []
+        self.current_round_polys = []
         self.node_texts = []
         self.edge_texts = []
 
@@ -358,11 +407,6 @@ class GraphVisualizer3D:
         self._draw_timer = self.fig.canvas.new_timer(interval=50)
         self._draw_timer.add_callback(self.draw_graph)
         self._draw_timer.start()
-
-    def reset_view(self):
-        """Reset the camera view to a top-down perspective."""
-        self.ax.view_init(elev=90, azim=-90)
-        self.fig.canvas.draw_idle()
 
     def draw_graph(self):
         """
@@ -411,10 +455,12 @@ class GraphVisualizer3D:
                     xs.append(x)
                     ys.append(y)
                     zs.append(z)
-                    colors.append(to_rgba(self.node_colors[node], alpha=0.8))
+                    _, round, _= self.parse_node_str(node)
+                    alpha = 0.8 if round <= self.step_data.get(self.current_decoding_step, (-1,[]))[0] else 0.3
+                    colors.append(to_rgba(self.node_colors[node], alpha=alpha))
         if self.node_scatter is not None:
-            self.node_scatter._offsets3d = (np.array(xs), np.array(ys), np.array(zs))
-            self.node_scatter.set_color(colors)
+            self.node_scatter.remove()
+            self.node_scatter = self.ax.scatter(xs, ys, zs, c=colors, s=100)
             self.node_scatter.set_visible(self.show_nodes)
         else:
             self.node_scatter = self.ax.scatter(xs, ys, zs, c=colors, s=100, alpha=0.8)
@@ -447,6 +493,14 @@ class GraphVisualizer3D:
             all_segments.append(seg)
             if data.get('label', '') in self.error_edges:
                 error_segments.append(seg)
+                if u in self.marked_nodes:
+                    self.marked_nodes.remove(u)
+                else:
+                    self.marked_nodes.add(u)
+                if v in self.marked_nodes:
+                    self.marked_nodes.remove(v)
+                else:
+                    self.marked_nodes.add(v)
             if data.get('label', '') in self.correction_edges:
                 corrections_segment.append(seg)
             if not self.show_edge_labels:
@@ -478,7 +532,7 @@ class GraphVisualizer3D:
         # Update error edges independently: drawn if "Errors" is enabled.
         if self.show_errors:
             self.error_edge_collection.set_segments(error_segments)
-            self.error_edge_collection.set_color('red')
+            self.error_edge_collection.set_color(self.edge_colors_palette["error"])
             self.error_edge_collection.set_linewidth(2.5)
         else:
             self.error_edge_collection.set_segments(np.empty((0, 2, 3)))
@@ -486,19 +540,47 @@ class GraphVisualizer3D:
         # Update correction edges.
         if self.show_corrections:
             self.correction_edge_collection.set_segments(corrections_segment)
-            self.correction_edge_collection.set_color('green')
+            self.correction_edge_collection.set_color(self.edge_colors_palette["correction"])
             self.correction_edge_collection.set_linewidth(1.5)
         else:
             self.correction_edge_collection.set_segments(np.empty((0, 2, 3)))
-
+        
         # Prepare cluster edges.
-        cluster_segments = []
-        if self.clusters_dir and self.show_clusters:
-            step_clusters = self.clusters.get(self.current_cluster_step, [])
+        if self.step_dir and self.show_steps:
+            step_round, step_clusters = self.step_data.get(self.current_decoding_step, (-1,[]))
+            for current_round_poly in self.current_round_polys:
+                current_round_poly.remove()
+            self.current_round_polys = []
+            if step_round >= 0:
+                # Draw a transparent polygon at the current round height.
+                z_height = step_round+0.25
+                x_vals = [min(xs) - 2, max(xs) + 2, max(xs) + 2, min(xs) - 2]+[min(xs) - 2, max(xs) + 2, max(xs) + 2, min(xs) - 2]
+                y_vals = [min(ys) - 2, min(ys) - 2, max(ys) + 2, max(ys) + 2]+[min(ys) - 2, min(ys) - 2, max(ys) + 2, max(ys) + 2]
+                z_vals = [-0.5,-0.5,-0.5,-0.5] + [z_height] * 4
+                verts = [list(zip(x_vals, y_vals, z_vals))]
+                faces = [
+                    [0, 1, 2, 3],  # bottom (z = 0)
+                    [4, 5, 6, 7],  # top (z = 1)
+                    [0, 1, 5, 4],  # front (y = 0)
+                    [2, 3, 7, 6],  # back (y = 1)
+                    [1, 2, 6, 5],  # right (x = 1)
+                    [0, 3, 7, 4],  # left (x = 0)
+                ]
+                for face in faces:
+                    poly_verts = [verts[0][i] for i in face]
+                    poly = Poly3DCollection([poly_verts], alpha=0.2, facecolor=self.current_round_color, zorder=-1)
+                    self.ax.add_collection3d(poly)
+                    self.current_round_polys.append(poly)
+                                
+            for collection in self.cluster_edge_collections:
+                collection.remove()
+            self.cluster_edge_collections = []
+            cluster_segments = {}
             for cluster_entry in step_clusters:
                 edge_id = cluster_entry['edge_id']
                 tree_node_id = cluster_entry['tree_node_id']
                 growth = float(cluster_entry['growth'])
+                cluster_id = int(cluster_entry['cluster_id'])
                 # Find the edge in the graph matching edge_id
                 for u, v, data in self.G.edges(data=True):
                     if u not in visible_nodes or v not in visible_nodes:
@@ -516,22 +598,23 @@ class GraphVisualizer3D:
                             start = draw_pos[u]
                             end = draw_pos[v]
                         # Compute the segment according to growth
-                        seg = [
+                        seg = ([
                             start,
                             (
                                 start[0] + (end[0] - start[0]) * growth,
                                 start[1] + (end[1] - start[1]) * growth,
                                 start[2] + (end[2] - start[2]) * growth
                             )
-                        ]
-                        cluster_segments.append(seg)
+                        ])
+                        if cluster_id not in cluster_segments:
+                            cluster_segments[cluster_id] = []
+                        cluster_segments[cluster_id].append(seg)
                         break
-        if cluster_segments:
-            self.cluster_edge_collection.set_segments(cluster_segments)
-            self.cluster_edge_collection.set_color('blue')
-            self.cluster_edge_collection.set_linewidth(4)
-        else:
-            self.cluster_edge_collection.set_segments(np.empty((0, 2, 3)))
+            for cluster_id, segments in cluster_segments.items():
+                color = self.edge_colors_palette["cluster"][cluster_id % len(self.edge_colors_palette["cluster"])]
+                collection = Line3DCollection(segments, colors=color, linewidths=2.5)
+                self.cluster_edge_collections.append(collection)
+                self.ax.add_collection3d(collection)
 
         # Manually set x- and y-axis limits based on visible nodes.
         if xs:
@@ -545,10 +628,10 @@ class GraphVisualizer3D:
             if zs:
                 self.ax.set_zlim(min(zs) - 1, max(zs) + 1)
 
-        # Remove axis ticks.
-        self.ax.set_xticks([])
-        self.ax.set_yticks([])
-        self.ax.set_zticks([])
+        # Remove axes.
+        self.ax.set_axis_off()
+        # Side view by default.
+        self.ax.view_init(elev=0, azim=0)
         self.fig.canvas.draw_idle()
 
     def toggle_visibility(self, label):
@@ -564,14 +647,14 @@ class GraphVisualizer3D:
             self.show_errors = not self.show_errors
         elif label == 'Corrections':
             self.show_corrections = not self.show_corrections
-        elif label == 'Clusters' and self.clusters_dir:
-            self.show_clusters = not self.show_clusters
+        elif label == 'Clusters' and self.step_dir:
+            self.show_steps = not self.show_steps
         elif label == 'Single Layer':
             self.single_layer_enabled = not self.single_layer_enabled
         self.schedule_draw()
 
     def update_cluster_step(self, val):
-        self.current_cluster_step = int(val)
+        self.current_decoding_step = int(val)
         self.schedule_draw()
 
     def update_selected_layer(self, label):
@@ -591,6 +674,141 @@ class GraphVisualizer3D:
         self.ax.view_init(elev=0, azim=0)
         self.fig.canvas.draw_idle()
 
+    def save_clustering_animation(self, animation_dir, make_comic=False, animation_grid_path=None):
+        """
+        Export images for each cluster step to animation_dir.
+        Optionally, combine them into a comic-strip style image.
+
+        :param animation_dir: directory to save individual step images
+        :param make_comic: if True, generate a single comic-strip image
+        :param comic_path: path to save comic-strip image
+        :param arrow_size: length of arrows in comic strip
+        :param spacing: vertical padding in comic strip
+        """
+        os.makedirs(animation_dir, exist_ok=True)
+        print(f"[INFO] Exporting cluster step images to: {animation_dir}")
+        exported_files = []
+        
+        self.show_edges = True
+        self.show_edge_labels = False
+        self.show_nodes = True
+        self.show_steps = True
+        self.show_corrections = True
+        self.show_errors = True
+        
+        previous_decoding_step = self.decoding_steps[0] if self.decoding_steps else None
+        for step in self.decoding_steps:
+            self.current_decoding_step = step
+            
+            self.draw_graph()
+            self.fig.canvas.draw()  # update buffer
+            output_path = os.path.join(animation_dir, f"step_{step:03d}.png")
+            current_decoding_step = self.step_data.get(step)
+            if previous_decoding_step is not None and current_decoding_step == previous_decoding_step:
+                print(f"[INFO]  Skipping {output_path} (no changes)")
+                continue
+            
+            self.fig.savefig(output_path, dpi=300, bbox_inches='tight', transparent=True)
+            previous_decoding_step = current_decoding_step
+            exported_files.append(output_path)
+            print(f"[INFO]  Saved {output_path}")
+
+        print("[INFO] Export complete.")
+        if not make_comic:
+            return
+        
+        if animation_grid_path is None:
+            animation_grid_path = os.path.join(animation_dir, "animation.png")
+        
+        columns = 3
+        # FIXME: make unecessary by cropping images during export as needed
+        crop_margin_width = 200
+        crop_margin_height = 400
+        spacing_x = 20
+        spacing_y = 20
+        arrow_color = (200, 200, 200, 100)  # light gray with transparency
+        arrow_width = 200
+                
+        # Load and crop images
+        imgs = []
+        for f in exported_files:
+            img = Image.open(f).convert("RGBA")
+            w, h = img.size
+            left = crop_margin_width
+            upper = crop_margin_height
+            right = max(w - crop_margin_width, left)
+            lower = max(h - crop_margin_height, upper)
+            img = img.crop((left, upper, right, lower))
+            imgs.append(img)
+
+        widths, heights = zip(*(i.size for i in imgs))
+        max_width = max(widths)
+        max_height = max(heights)
+
+        n_images = len(imgs)
+        rows = (n_images + columns - 1) // columns
+
+        canvas_width = columns * max_width + (columns - 1) * spacing_x
+        canvas_height = rows * max_height + (rows - 1) * spacing_y
+        new_img = Image.new('RGBA', (canvas_width, canvas_height), color=(255, 255, 255, 0))
+        draw = ImageDraw.Draw(new_img, 'RGBA')
+
+        # Precompute centers for arrow path
+        centers = []
+        for row in range(rows):
+            y_offset = row * (max_height + spacing_y)
+            for col in range(columns):
+                idx = row * columns + col
+                if idx >= n_images:
+                    break
+                if row % 2 == 0:
+                    x_offset = col * (max_width + spacing_x)
+                else:
+                    x_offset = canvas_width - (col + 1) * (max_width + spacing_x) + spacing_x
+                cx = x_offset + max_width // 2
+                cy = y_offset + max_height // 2
+                centers.append((cx, cy))
+                
+        # Draw the faint zig-zag arrow path
+        if len(centers) > 1:
+            draw.line(centers, fill=arrow_color, width=arrow_width, joint="curve")
+
+            # Draw a large arrowhead at the end
+            end_x, end_y = centers[-1]
+            head_size = arrow_width * 1.2
+            draw.polygon(
+                [
+                    (end_x + head_size*((-1)**(rows-1)), end_y),
+                    (end_x, end_y - head_size*0.7),
+                    (end_x, end_y + head_size*0.7),
+                ],
+                fill=arrow_color,
+            )
+
+        # Paste images
+        for row in range(rows):
+            y_offset = row * (max_height + spacing_y)
+            for col in range(columns):
+                idx = row * columns + col
+                if idx >= n_images:
+                    break
+                img = imgs[idx]
+                if row % 2 == 0:
+                    x_offset = col * (max_width + spacing_x)
+                else:
+                    x_offset = canvas_width - (col + 1) * (max_width + spacing_x) + spacing_x
+                new_img.alpha_composite(img, (x_offset, y_offset))
+    
+            
+        new_img.save(animation_grid_path)
+        print(f"[INFO] Comic strip saved to {animation_grid_path}")
+        
+        # Create gif
+        gif_path = os.path.join(animation_dir, "animation.gif")
+        imgs[0].save(gif_path, save_all=True, append_images=imgs[1:], duration=1500, loop=0)
+        print(f"[INFO] Animated GIF saved to {gif_path}")
+
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -598,12 +816,12 @@ def main():
     )
     parser.add_argument('directory', help='Directory with runs.')
     parser.add_argument('run_id', help='Run to visualize.')
-    parser.add_argument('code', help='Code type (e.g., surface_code)')
     parser.add_argument('--graph_file', help='Path to the graph file')
     parser.add_argument('--errors_file', help='Path to the errors file')
     parser.add_argument('--decoder', help='Decoder for which to show clustering.')
-    parser.add_argument('--clusters', help='Directory containing cluster step files', default=None)
+    parser.add_argument('--steps', help='Directory containing cluster step files', default=None)
     parser.add_argument("--corrections_file", help="File containing corrections by decoder")
+    parser.add_argument('--animation_dir', help='If set, exports each cluster step as an image to this directory', default=None)
     args = parser.parse_args()
 
     if not args.graph_file:
@@ -611,38 +829,43 @@ def main():
     if not args.errors_file:
         args.errors_file = f"{args.directory}/{args.run_id}/errors.txt"
     if args.decoder:
-        if not args.clusters:
-            args.clusters = f"{args.directory}/{args.run_id}/{args.decoder}"
+        if not args.steps:
+            args.steps = f"{args.directory}/{args.run_id}/{args.decoder}"
         if not args.corrections_file:
             args.corrections_file = f"{args.directory}/{args.run_id}/{args.decoder}/corrections.txt"
 
-    visualizer = GraphVisualizer3D(args.graph_file, args.errors_file, args.code, clusters_dir=args.clusters,
+    visualizer = GraphVisualizer3D(args.graph_file, args.errors_file, step_dir=args.steps,
                                    corrections_file=args.corrections_file)
-
+    # --- Export mode: save images for each cluster step instead of interactive display ---
+    if args.animation_dir and args.decoder and args.steps and visualizer.decoding_steps:
+        os.makedirs(args.animation_dir, exist_ok=True)
+        visualizer.save_clustering_animation(args.animation_dir, make_comic=True)
+        sys.exit(0)
+        
     # Create check buttons.
     rax = plt.axes([0.01, 0.4, 0.2, 0.35])
     check_labels = ['Nodes', 'Node Labels', 'Edges', 'Edge Labels', 'Errors']
     if args.corrections_file:
         check_labels.append('Corrections')
-    if args.clusters:
-        check_labels.append('Clusters')
+    if args.steps:
+        check_labels.append('Decoding Steps')
     check_labels.append('Single Layer')
     initial = [visualizer.show_nodes, visualizer.show_node_labels,
                visualizer.show_edges, visualizer.show_edge_labels,
                visualizer.show_errors, visualizer.show_corrections]
-    if args.clusters:
-        initial.append(visualizer.show_clusters)
+    if args.steps:
+        initial.append(visualizer.show_steps)
     initial.append(visualizer.single_layer_enabled)
     check = CheckButtons(rax, check_labels, initial)
     check.on_clicked(visualizer.toggle_visibility)
 
     # If clusters are provided, add a slider.
-    if args.clusters and visualizer.cluster_steps:
+    if args.steps and visualizer.decoding_steps:
         axstep = plt.axes([0.3, 0.1, 0.5, 0.03])
         slider = Slider(axstep, 'Cluster Step',
-                        min(visualizer.cluster_steps),
-                        max(visualizer.cluster_steps),
-                        valinit=min(visualizer.cluster_steps),
+                        min(visualizer.decoding_steps),
+                        max(visualizer.decoding_steps),
+                        valinit=min(visualizer.decoding_steps),
                         valstep=1)
         slider.on_changed(visualizer.update_cluster_step)
 

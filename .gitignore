@@ -5,3 +5,7 @@
 /runs*
 /tools/plots
 .envrc
+
+paper/
+
+.vscode/
