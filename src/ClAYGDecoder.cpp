@@ -11,31 +11,9 @@
 using namespace std;
 
 ClAYGDecoder::ClAYGDecoder(std::unordered_map<std::string, std::string> args)
+    : UnionFindDecoder(args)
 {
-    this->decoder_name_ = "clayg";
-
-    if (auto it = args.find("stop_early"); it != args.end()) {
-        this->set_stop_early(it->second == "true");
-        this->decoder_name_ += it->second == "true" ? "_stop_early" : "_no_stop_early";
-    }
-
-    if (auto it = args.find("growth_policy"); it != args.end()) {
-        string policy = it->second;
-        if (policy == "third") {
-            this->set_growth_policy([] (const DecodingGraphNode::Id start, const DecodingGraphNode::Id end) {
-                if (start.round == end.round) return 0.34;
-                if (start.round > end.round) return 1.0;
-                return 0.5;
-            });
-            this->decoder_name_ += "_third_growth";
-        } else if (policy == "faster_backwards") {
-            this->set_growth_policy([] (const DecodingGraphNode::Id start, const DecodingGraphNode::Id end) {
-                if (start.round > end.round) return 1.0;
-                return 0.5;
-            });
-            this->decoder_name_ += "_faster_backwards_growth";
-        }
-    }
+    this->decoder_name_.replace(0, 2, "clayg");
 
     if (auto it = args.find("cluster_lifetime"); it != args.end()) {
         this->set_cluster_lifetime_factor(stod(it->second));
@@ -45,24 +23,7 @@ ClAYGDecoder::ClAYGDecoder(std::unordered_map<std::string, std::string> args)
 
 DecodingResult ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
 {
-    vector<shared_ptr<DecodingGraphNode>> marked_nodes;
-
-    for (const auto& node : graph->nodes())
-    {
-        if (node->marked())
-        {
-            marked_nodes.push_back(node);
-        }
-    }
-
-    sort(marked_nodes.begin(), marked_nodes.end(), [](const auto& node1, const auto& node2)
-    {
-        if (node1->id().round == node2->id().round)
-        {
-            return node1->id().id < node2->id().id;
-        }
-        return node1->id().round < node2->id().round;
-    });
+    auto marked_nodes_by_round = graph->marked_nodes_by_round();
 
     const int rounds = graph->t();
     if (!decoding_graph_ || decoding_graph_->d() != graph->d())
@@ -81,7 +42,7 @@ DecodingResult ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
     {
         last_growth_steps_ = ceil(last_growth_steps_);
         vector<shared_ptr<DecodingGraphNode>> nodes;
-        for (const auto& node : marked_nodes)
+        for (const auto& node : marked_nodes_by_round[current_round_])
         {
             if (node->id().round == current_round_)
             {
@@ -119,7 +80,8 @@ DecodingResult ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
         error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
         if (stop_early_ && Cluster::all_clusters_are_neutral(m_clusters))
         {
-            if (current_round_-last_encountered_non_neutral_cluster >= (decoding_graph_->d()-1)/2)
+            int buffer_region = (decoding_graph_->d()+1)/2;
+            if (current_round_-last_encountered_non_neutral_cluster >= buffer_region)
             {
                 considered_up_to_round = current_round_;
                 break;
@@ -131,7 +93,7 @@ DecodingResult ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
         }
     }
 
-    logger.log_decoding_step(m_clusters, decoder_name_, step++, rounds-1);
+    logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
 
     while (!Cluster::all_clusters_are_neutral(m_clusters))
     {
@@ -146,7 +108,7 @@ DecodingResult ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
                 fusion_edges.push_back(fusion_edge);
             }
         }
-        logger.log_decoding_step(m_clusters, decoder_name_, step++, rounds-1);
+        logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
         merge(fusion_edges);
     }
 
@@ -154,7 +116,7 @@ DecodingResult ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
     auto new_error_edges = peeling_result.corrections;
     error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
 
-    logger.log_decoding_step(m_clusters, decoder_name_, step++, rounds-1);
+    logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
 
     return {error_edges, considered_up_to_round};
 }

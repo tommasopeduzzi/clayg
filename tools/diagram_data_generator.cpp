@@ -42,7 +42,7 @@ int main()
             {DecodingGraphEdge::Type::MEASUREMENT, 3,3},
             {DecodingGraphEdge::Type::NORMAL, 3,3},
             {DecodingGraphEdge::Type::NORMAL, 1,1},
-//            {DecodingGraphEdge::Type::MEASUREMENT, 5,1},
+            {DecodingGraphEdge::Type::MEASUREMENT, 5,1},
         };
         error_edges = {};
         for (auto error_id : error_ids)
@@ -50,11 +50,13 @@ int main()
 
         decoding_graph->mark(error_edges);
 
-        auto decoder = make_shared<ClAYGDecoder>();
-        auto result = decoder->decode(decoding_graph);
-        auto corrections = result.corrections;
+        auto decoder_args = unordered_map<string, string>{
+            {"stop_early", "true"}
+        };
+        const auto decoder = make_shared<ClAYGDecoder>(decoder_args);
+        auto [corrections, considered_up_to_round] = decoder->decode(decoding_graph);
         vector<DecodingGraphEdge::Id> correction_ids;
-        for (auto edge : corrections)
+        for (const auto& edge : corrections)
             correction_ids.push_back(edge->id());
 
         logger.log_errors(error_ids);

@@ -6,6 +6,7 @@
 #define CLAYG_DECODER_H
 
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "DecodingGraph.h"
@@ -18,6 +19,8 @@ struct DecodingResult {
 
 class Decoder {
 public:
+    explicit Decoder(const std::unordered_map<std::string, std::string>& args = {}) {};
+
     virtual ~Decoder() = default;
 
     virtual DecodingResult decode(std::shared_ptr<DecodingGraph> graph) {

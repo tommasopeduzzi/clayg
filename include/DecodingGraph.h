@@ -189,6 +189,8 @@ public:
     void reset();
 
     void mark(const std::vector<std::shared_ptr<DecodingGraphEdge>>& error_edges);
+
+    std::vector<std::vector<std::shared_ptr<DecodingGraphNode>>> marked_nodes_by_round();
 };
 
 

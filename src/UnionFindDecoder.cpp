@@ -10,12 +10,65 @@
 
 using namespace std;
 
+UnionFindDecoder::UnionFindDecoder(std::unordered_map<std::string, std::string> args)
+{
+    decoder_name_ = "uf";
+
+    if (auto it = args.find("stop_early"); it != args.end()) {
+        this->set_stop_early(it->second == "true");
+        this->decoder_name_ += it->second == "true" ? "_stop_early" : "_no_stop_early";
+    }
+
+    if (const auto it = args.find("growth_policy"); it != args.end()) {
+        string policy = it->second;
+        if (policy == "third") {
+            this->set_growth_policy([] (const DecodingGraphNode::Id start, const DecodingGraphNode::Id end) {
+                if (start.round == end.round) return 0.34;
+                if (start.round > end.round) return 1.0;
+                return 0.5;
+            });
+            this->decoder_name_ += "_third_growth";
+        } else if (policy == "faster_backwards") {
+            this->set_growth_policy([] (const DecodingGraphNode::Id start, const DecodingGraphNode::Id end) {
+                if (start.round > end.round) return 1.0;
+                return 0.5;
+            });
+            this->decoder_name_ += "_faster_backwards_growth";
+        }
+    }
+}
+
+
 DecodingResult UnionFindDecoder::decode(const shared_ptr<DecodingGraph> graph)
 {
+    int consider_up_to_round_ = graph->t();
+    if (stop_early_)
+    {
+        const int buffer_region = (graph->d() + 1) / 2;
+        auto marked_nodes_by_round = graph->marked_nodes_by_round();
+        int last_round_with_marked_node = 0;
+        for (int round = 0; round < graph->t(); round++)
+        {
+            if (!marked_nodes_by_round[round].empty())
+            {
+                last_round_with_marked_node = round;
+            }
+            if (round - last_round_with_marked_node >= buffer_region)
+            {
+                break;
+            }
+        }
+        consider_up_to_round_ = min(graph->t()-1, last_round_with_marked_node + buffer_region);
+    }
+
     // Initialize clusters
     m_clusters = {};
     for (const auto& node : graph->nodes())
     {
+        if (stop_early_ && node->id().round > consider_up_to_round_)
+        {
+            continue;
+        }
         if (node->marked())
         {
             auto cluster = make_shared<Cluster>(node);
@@ -27,7 +80,7 @@ DecodingResult UnionFindDecoder::decode(const shared_ptr<DecodingGraph> graph)
 
     int steps = 0;
     // Main Union Find loop
-    logger.log_decoding_step(m_clusters, "uf", steps++);
+    logger.log_decoding_step(m_clusters, decoder_name_, steps++, consider_up_to_round_);
     while (!Cluster::all_clusters_are_neutral(m_clusters))
     {
         graph->node(DecodingGraphNode::Id{DecodingGraphNode::ANCILLA, 4, 2});
@@ -40,11 +93,15 @@ DecodingResult UnionFindDecoder::decode(const shared_ptr<DecodingGraph> graph)
                 fusion_edges.push_back(fusion_edge);
             }
         }
-        logger.log_decoding_step(m_clusters, "uf", steps++);
+        logger.log_decoding_step(m_clusters, decoder_name_, steps++, consider_up_to_round_);
         merge(fusion_edges);
+        logger.log_decoding_step(m_clusters, decoder_name_, steps++, consider_up_to_round_);
     }
     last_growth_steps_ = steps;
-    return PeelingDecoder::decode(m_clusters, graph);
+    auto peeling_decoder_results = PeelingDecoder::decode(m_clusters, graph);
+    // Log after peeling (no more clusters)
+    logger.log_decoding_step({}, decoder_name_, steps++, consider_up_to_round_);
+    return {peeling_decoder_results.corrections, consider_up_to_round_};
 }
 
 vector<DecodingGraphEdge::FusionEdge> UnionFindDecoder::grow(const shared_ptr<Cluster>& cluster)

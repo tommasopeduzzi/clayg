@@ -21,13 +21,11 @@ protected:
         {
             return 0.5;
         };
+    bool stop_early_ = false;
 
 
 public:
-    UnionFindDecoder()
-    {
-        decoder_name_ = "uf";
-    }
+    explicit UnionFindDecoder(std::unordered_map<std::string, std::string> args = {});
 
     DecodingResult decode(std::shared_ptr<DecodingGraph> graph) override;
 
@@ -38,6 +36,8 @@ public:
     int get_last_growth_steps() const override { return last_growth_steps_; }
 
     void set_growth_policy(const std::function<float(DecodingGraphNode::Id, DecodingGraphNode::Id)> policy) { growth_policy_ = policy; }
+
+    void set_stop_early(const bool stop_early) { stop_early_ = stop_early; }
 };
 
 

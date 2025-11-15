@@ -330,3 +330,20 @@ void DecodingGraph::mark(const std::vector<std::shared_ptr<DecodingGraphEdge>>& 
         }
     }
 }
+
+std::vector<std::vector<std::shared_ptr<DecodingGraphNode>>> DecodingGraph::marked_nodes_by_round()
+{
+    vector<vector<shared_ptr<DecodingGraphNode>>> marked_nodes;
+    for (int round = 0; round < T; round++)
+    {
+        marked_nodes.push_back({});
+    }
+    for (const auto& node : m_nodes)
+    {
+        if (node->marked())
+        {
+            marked_nodes[node->id().round].push_back(node);
+        }
+    }
+    return marked_nodes;
+}
