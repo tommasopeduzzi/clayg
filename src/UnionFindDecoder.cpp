@@ -27,7 +27,7 @@ DecodingResult UnionFindDecoder::decode(const shared_ptr<DecodingGraph> graph)
 
     int steps = 0;
     // Main Union Find loop
-    logger.log_clusters(m_clusters, "uf", steps++);
+    logger.log_decoding_step(m_clusters, "uf", steps++);
     while (!Cluster::all_clusters_are_neutral(m_clusters))
     {
         graph->node(DecodingGraphNode::Id{DecodingGraphNode::ANCILLA, 4, 2});
@@ -40,7 +40,7 @@ DecodingResult UnionFindDecoder::decode(const shared_ptr<DecodingGraph> graph)
                 fusion_edges.push_back(fusion_edge);
             }
         }
-        logger.log_clusters(m_clusters, "uf", steps++);
+        logger.log_decoding_step(m_clusters, "uf", steps++);
         merge(fusion_edges);
     }
     last_growth_steps_ = steps;
@@ -62,19 +62,16 @@ vector<DecodingGraphEdge::FusionEdge> UnionFindDecoder::grow(const shared_ptr<Cl
         auto edge = boundary_edge.edge;
         float growth = growth_policy_(tree_node->id(), leaf_node->id());
         edge->add_growth(growth);
+        boundary_edge.growth_from_tree += growth;
+        boundary_edges.push_back(boundary_edge);
 
         if (edge->growth() >= edge->weight())
         {
-            cluster->add_edge(edge);
             fusion_edges.push_back(DecodingGraphEdge::FusionEdge{
                 edge,
                 tree_node,
                 leaf_node
             });
-        }
-        else
-        {
-            boundary_edges.push_back(boundary_edge);
         }
     }
 
@@ -104,7 +101,7 @@ void UnionFindDecoder::merge(const vector<DecodingGraphEdge::FusionEdge>& fusion
             if (leaf_node->id().type == DecodingGraphNode::VIRTUAL)
                 cluster->add_virtual_node(leaf_node);
 
-            cluster->add_edge(fusion_edge.edge);
+            cluster->add_bulk_edge(fusion_edge.edge);
             for (const auto& edge_weak_ptr : leaf_node->edges())
             {
                 auto edge = edge_weak_ptr.lock();
@@ -143,7 +140,7 @@ void UnionFindDecoder::merge(const vector<DecodingGraphEdge::FusionEdge>& fusion
         }
         for (const auto& edge : other_cluster->edges())
         {
-            cluster->add_edge(edge);
+            cluster->add_bulk_edge(edge);
         }
         for (const auto& boundary : other_cluster->boundary())
         {

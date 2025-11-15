@@ -12,6 +12,7 @@
 #include <map>
 #include <set>
 #include <cassert>
+#include <string>
 
 #include "Cluster.h"
 
@@ -142,6 +143,7 @@ inline void operator++(DecodingGraphEdge::Id& id, int)
 class DecodingGraph
 {
     int m_ancilla_count_per_layer, D, T;
+    std::string code_name_;
 
     std::vector<std::shared_ptr<DecodingGraphNode>> m_nodes;
     std::vector<std::map<int, std::shared_ptr<DecodingGraphNode>>> m_ancilla_nodes;
@@ -165,6 +167,8 @@ public:
     [[nodiscard]] int d() const { return D; }
 
     [[nodiscard]] int t() const { return T; }
+
+    [[nodiscard]] std::string code_name() { return code_name_;}
 
     std::vector<std::shared_ptr<DecodingGraphNode>> nodes() { return m_nodes; }
 

@@ -22,8 +22,8 @@ public:
     static void clear_files_by_pattern(const std::string& dir, const std::string& pattern);
 
     // Structured logging APIs (no filename/directory args)
-    void log_clusters(const std::vector<std::shared_ptr<Cluster>>& clusters, const std::string& decoder, int step) const;
-    void log_graph(const std::vector<std::shared_ptr<DecodingGraphEdge>>& edges) const;
+    void log_decoding_step(const std::vector<std::shared_ptr<Cluster>>& clusters, const std::string& decoder, int step, int current_round = -1) const;
+    void log_graph(const std::shared_ptr<DecodingGraph>& graph) const;
     void log_errors(const std::vector<DecodingGraphEdge::Id>& error_ids) const;
     void log_corrections(const std::vector<DecodingGraphEdge::Id>& correction_ids, const std::string& decoder) const;
     void log_results_entry(double logical_error_rate, int runs, double p, double idling_time_constant, const std::string& decoder_name);

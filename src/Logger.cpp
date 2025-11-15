@@ -61,35 +61,54 @@ void Logger::increment_run_id(int by) {
     run_id += by;
 }
 
-void Logger::log_clusters(const std::vector<std::shared_ptr<Cluster>>& clusters, const std::string& decoder, int step) const {
+void Logger::log_decoding_step(const std::vector<std::shared_ptr<Cluster>>& clusters, const std::string& decoder, int step, int current_round) const {
     if (!dump_enabled) return;
+    // FIXME: do this in decoder instead of here
     std::ostringstream content;
-    int cluster_id = 0;
+    if (current_round >= 0) {
+        content << "current_round=" << current_round << "\n";
+    }
     for (const auto& cluster : clusters) {
+        auto cluster_root = cluster->root().lock();
+        int cluster_id = cluster_root->id().id;
+        cluster_id += cluster->root().lock()->id().round * 1000;
         for (const auto& edge : cluster->edges()) {
+            // check if edge is in boundary
+            bool in_boundary = false;
+            for (const auto& boundary : cluster->boundary())
+            {
+                if (boundary.edge == edge)
+                {
+                    in_boundary = true;
+                    break;
+                }
+            }
+            if (in_boundary) continue;
             content << edge->id().type << "-" << edge->id().round << "-" << edge->id().id;
             auto tree_node = edge->nodes().first.lock();
             content << "," << tree_node->id().type << "-" << tree_node->id().round << "-" << tree_node->id().id;
             content << "," << "1.0" << "," << cluster_id << "\n";
         }
         for (const auto& boundary : cluster->boundary()) {
+            if (boundary.growth_from_tree == 0) continue;
             content << boundary.edge->id().type << "-" << boundary.edge->id().round << "-" << boundary.edge->id().id;
             // log tree node
             content << "," << boundary.tree_node->id().type << "-" << boundary.tree_node->id().round << "-" << boundary.tree_node->id().id;
             // log edge growth
-            content << "," << boundary.edge->growth() << "," << cluster_id << "\n";
+            content << "," << boundary.growth_from_tree << "," << cluster_id << "\n";
         }
-        cluster_id++;
     }
     std::string dir = dump_dir_ + "/" + std::to_string(run_id) + "/" + decoder;
     std::filesystem::create_directories(dir);
-    std::string filename = dir + "/clusters_step_" + std::to_string(step) + ".txt";
+    std::string filename = dir + "/decoding_step_" + std::to_string(step) + ".txt";
     write_to_file(filename, content.str(), false);
 }
 
-void Logger::log_graph(const std::vector<std::shared_ptr<DecodingGraphEdge>>& edges) const {
+void Logger::log_graph(const std::shared_ptr<DecodingGraph>& graph) const {
     if (!dump_enabled) return;
     std::ostringstream content;
+    content << graph->code_name() << "\n";
+    auto edges = graph->edges();
     for (const auto& edge : edges) {
         auto [node1, node2] = edge->nodes();
         auto n1 = node1.lock();

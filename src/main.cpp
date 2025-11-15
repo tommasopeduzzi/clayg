@@ -356,7 +356,7 @@ int main(int argc, char* argv[])
             logger.prepare_dump_dir();
             error_edge_ids = generate_errors(D, T, p, dis, gen);
             logger.log_errors(error_edge_ids);
-            logger.log_graph(graph->edges());
+            logger.log_graph(graph);
             error_edges.clear();
             for (auto id : error_edge_ids)
             {

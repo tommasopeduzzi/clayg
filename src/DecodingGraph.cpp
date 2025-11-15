@@ -16,6 +16,7 @@ shared_ptr<DecodingGraph> DecodingGraph::surface_code(int D, int T) {
     graph->m_ancilla_count_per_layer = ancilla_height * ancilla_width;
     graph->D = D;
     graph->T = T;
+    graph->code_name_ = "surface_code";
 
     const shared_ptr<DecodingGraphNode> top_boundary_node = make_shared<DecodingGraphNode>(
         DecodingGraphNode::Id{DecodingGraphNode::Type::VIRTUAL, 0, 0});
@@ -88,6 +89,7 @@ shared_ptr<DecodingGraph> DecodingGraph::rotated_surface_code(int D, int T) {
     graph->m_ancilla_count_per_layer = ancilla_height * ancilla_width;
     graph->D = D;
     graph->T = T;
+    graph->code_name_ = "rotated_surface_code";
 
     const shared_ptr<DecodingGraphNode> top_boundary_node = make_shared<DecodingGraphNode>(
         DecodingGraphNode::Id{DecodingGraphNode::Type::VIRTUAL, 0, 0});
@@ -186,6 +188,7 @@ std::shared_ptr<DecodingGraph> DecodingGraph::repetition_code(int D, int T)
     graph->m_ancilla_count_per_layer = D;
     graph->D = D;
     graph->T = T;
+    graph->code_name_ = "repetition_code";
 
     auto left_boundary_node = make_shared<DecodingGraphNode>(DecodingGraphNode::Id{DecodingGraphNode::VIRTUAL, 0,0});
     auto right_boundary_node = make_shared<DecodingGraphNode>(DecodingGraphNode::Id{DecodingGraphNode::VIRTUAL, 0,1});
