@@ -167,8 +167,16 @@ vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::clean(const shared_ptr<Decod
         }
 
         // Keep newly neutral clusters around.
-        const int cluster_lifetime = decoding_graph->d() * cluster_lifetime_factor_;
-        if (current_round_ - cluster->has_been_neutral_since() < cluster_lifetime)
+        int cluster_lifetime = 0;
+        if (cluster_lifetime_factor_ < 1)
+        {
+            cluster_lifetime = decoding_graph->d() * cluster_lifetime_factor_;
+        }
+        else {
+            cluster_lifetime = static_cast<int>(cluster_lifetime_factor_);
+        }
+
+        if (current_round_ - cluster->has_been_neutral_since() <= cluster_lifetime)
         {
             new_clusters.push_back(move(cluster));
             continue;
