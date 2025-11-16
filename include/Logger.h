@@ -41,9 +41,8 @@ public:
     std::string get_dump_dir();
 
     // Run ID management
-    void set_run_id(int id);
-    int get_run_id() const;
-    void increment_run_id(int by = 1);
+    void set_run_id(std::string id);
+    std::string get_run_id() const;
 
     // Distance management
     void set_distance(int distance);
@@ -61,7 +60,7 @@ public:
 
 private:
     bool dump_enabled = false;
-    int run_id = 0;
+    std::string run_id = 0;
     std::string dump_dir_ = "data/runs";
     std::string results_dir_ = "data/results";
     int distance_ = -1;

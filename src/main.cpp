@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <format>
 #include <random>
 #include <regex>
 #include <unordered_map>
@@ -351,6 +352,9 @@ int main(int argc, char* argv[])
             growth_steps[decoder->decoder_name()] = {};
         }
 
+        const std::string run_id_prefix = "d=" + std::to_string(D) + "_p=" + format("{:.5f}", p) + "_run=";
+        int dumped_runs = 0;
+        logger.set_run_id(run_id_prefix + std::to_string(dumped_runs));
         for (int i = 0; i < runs; i++)
         {
             logger.prepare_dump_dir();
@@ -413,7 +417,8 @@ int main(int argc, char* argv[])
             }
             if (uncorrected)
             {
-                logger.increment_run_id();
+                dumped_runs += 1;
+                logger.set_run_id(run_id_prefix + std::to_string(dumped_runs));
             }
             Logger::log_progress(i + 1, runs, p, D);
         }

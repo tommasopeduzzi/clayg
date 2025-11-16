@@ -10,6 +10,8 @@
 
 Logger logger;
 
+using namespace std;
+
 void Logger::write_to_file(const std::string& filename, const std::string& content, bool append) {
     std::ofstream file;
     if (append)
@@ -49,16 +51,12 @@ bool Logger::is_dump_enabled() const {
     return dump_enabled;
 }
 
-void Logger::set_run_id(int id) {
+void Logger::set_run_id(string id) {
     run_id = id;
 }
 
-int Logger::get_run_id() const {
+string Logger::get_run_id() const {
     return run_id;
-}
-
-void Logger::increment_run_id(int by) {
-    run_id += by;
 }
 
 void Logger::log_decoding_step(const std::vector<std::shared_ptr<Cluster>>& clusters, const std::string& decoder, int step, int current_round) const {
@@ -98,7 +96,7 @@ void Logger::log_decoding_step(const std::vector<std::shared_ptr<Cluster>>& clus
             content << "," << boundary.growth_from_tree << "," << cluster_id << "\n";
         }
     }
-    std::string dir = dump_dir_ + "/" + std::to_string(run_id) + "/" + decoder;
+    std::string dir = dump_dir_ + "/" + run_id + "/" + decoder;
     std::filesystem::create_directories(dir);
     std::string filename = dir + "/decoding_step_" + std::to_string(step) + ".txt";
     write_to_file(filename, content.str(), false);
@@ -119,7 +117,7 @@ void Logger::log_graph(const std::shared_ptr<DecodingGraph>& graph) const {
                     << edge->id().type << "-" << edge->id().round << "-" << edge->id().id << "\n";
         }
     }
-    std::string dir = dump_dir_ + "/" + std::to_string(run_id);
+    std::string dir = dump_dir_ + "/" + run_id;
     std::filesystem::create_directories(dir);
     std::string filename = dir + "/graph.txt";
     write_to_file(filename, content.str(), false);
@@ -131,7 +129,7 @@ void Logger::log_errors(const std::vector<DecodingGraphEdge::Id>& error_ids) con
     for (const auto& id : error_ids) {
         content << id.type << "-" << id.round << "-" << id.id << "\n";
     }
-    std::string dir = dump_dir_ + "/" + std::to_string(run_id);
+    std::string dir = dump_dir_ + "/" + run_id;
     std::filesystem::create_directories(dir);
     std::string filename = dir + "/errors.txt";
     write_to_file(filename, content.str(), false);
@@ -143,7 +141,7 @@ void Logger::log_corrections(const std::vector<DecodingGraphEdge::Id>& correctio
     for (const auto& id : correction_ids) {
         content << id.type << "-" << id.round << "-" << id.id << "\n";
     }
-    std::string dir = dump_dir_ + "/" + std::to_string(run_id) + "/" + decoder;
+    std::string dir = dump_dir_ + "/" + run_id + "/" + decoder;
     std::filesystem::create_directories(dir);
     std::string filename = dir + "/corrections.txt";
     write_to_file(filename, content.str(), false);
@@ -166,7 +164,7 @@ void Logger::prepare_steps_file(const std::string& decoder_name) {
 
 void Logger::prepare_dump_dir() const {
     if (!dump_enabled) return;
-    const std::string run_dir = dump_dir_ + "/" + std::to_string(run_id);
+    const std::string run_dir = dump_dir_ + "/" + run_id;
     std::filesystem::remove_all(run_dir);
     std::filesystem::create_directories(run_dir);
 }
