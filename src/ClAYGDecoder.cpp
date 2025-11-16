@@ -42,7 +42,6 @@ DecodingResult ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
     for (current_round_ = 0; current_round_ < rounds; current_round_++)
     {
         last_growth_steps_ = ceil(last_growth_steps_);
-        vector<shared_ptr<DecodingGraphNode>> nodes;
         for (const auto& node : marked_nodes_by_round[current_round_])
         {
             add(decoding_graph_, node);
@@ -114,9 +113,87 @@ DecodingResult ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
     auto new_error_edges = peeling_result.corrections;
     error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
 
-    logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
+    logger.log_decoding_step({}, decoder_name_, step++, current_round_);
 
     return {error_edges, considered_up_to_round};
+}
+
+void ClAYGDecoder::merge(const vector<DecodingGraphEdge::FusionEdge>& fusion_edges)
+{
+    for (const auto& fusion_edge : fusion_edges)
+    {
+        auto tree_node = fusion_edge.tree_node;;
+        // assert that tree node has cluster
+        assert(tree_node->cluster().has_value());
+        auto leaf_node = fusion_edge.leaf_node;
+
+        auto cluster = tree_node->cluster().value().lock();
+        auto other_cluster_optional = leaf_node->cluster();
+
+        if (!other_cluster_optional.has_value())
+        {
+            // node is not part of another cluster
+            cluster->add_node(leaf_node);
+            if (leaf_node->marked())
+                cluster->add_marked_node(leaf_node);
+            if (leaf_node->id().type == DecodingGraphNode::VIRTUAL)
+                cluster->add_virtual_node(leaf_node);
+
+            cluster->add_bulk_edge(fusion_edge.edge);
+            for (const auto& edge_weak_ptr : leaf_node->edges())
+            {
+                auto edge = edge_weak_ptr.lock();
+                if (edge != fusion_edge.edge)
+                {
+                    cluster->add_boundary_edge(Cluster::BoundaryEdge{
+                        leaf_node,
+                        edge->other_node(leaf_node).lock(),
+                        edge
+                    });
+                }
+            }
+            leaf_node->set_cluster(cluster);
+            if (cluster->is_neutral())
+                cluster->set_has_been_neutral_since(current_round_);
+            continue;
+        }
+
+        auto other_cluster = other_cluster_optional.value().lock();
+
+        if (other_cluster == cluster)
+        {
+            continue;
+        }
+
+        for (const auto& node : other_cluster->nodes())
+        {
+            cluster->add_node(node);
+            if (node->id().type == DecodingGraphNode::VIRTUAL)
+            {
+                cluster->add_virtual_node(node);
+            }
+            if (node->marked())
+            {
+                cluster->add_marked_node(node);
+            }
+            node->set_cluster(cluster);
+        }
+        for (const auto& edge : other_cluster->edges())
+        {
+            cluster->add_bulk_edge(edge);
+        }
+        for (const auto& boundary : other_cluster->boundary())
+        {
+            cluster->add_boundary_edge(boundary);
+        }
+
+        if (cluster->is_neutral())
+            cluster->set_has_been_neutral_since(current_round_);
+
+        auto cluster_to_be_removed = find(m_clusters.begin(), m_clusters.end(), other_cluster);
+        if (cluster_to_be_removed != m_clusters.end())
+            m_clusters.erase(cluster_to_be_removed);
+    }
 }
 
 void ClAYGDecoder::add(const shared_ptr<DecodingGraph>& graph, shared_ptr<DecodingGraphNode> node)
@@ -208,8 +285,6 @@ SingleLayerClAYGDecoder::SingleLayerClAYGDecoder(const std::unordered_map<std::s
         : ClAYGDecoder(args)
 {
     decoder_name_ = "sl_" + decoder_name_;
-    // FIXME: Should be optional!
-    decoding_graph_ = nullptr;
 }
 
 DecodingResult SingleLayerClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
@@ -316,9 +391,9 @@ DecodingResult SingleLayerClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
         logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
     }
 
-    auto new_error_edges = clean(decoding_graph_);
-    error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
-    logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
+    auto [peeling_error_edges, _] = PeelingDecoder::decode(m_clusters, decoding_graph_);
+    error_edges.insert(error_edges.end(), peeling_error_edges.begin(), peeling_error_edges.end());
+    logger.log_decoding_step({}, decoder_name_, step++, current_round_);
     return {error_edges, considered_up_to_round};
 }
 
@@ -358,81 +433,5 @@ void SingleLayerClAYGDecoder::add(const shared_ptr<DecodingGraph>& graph, shared
             new_cluster->add_virtual_node(node);
         }
         m_clusters.push_back(new_cluster);
-    }
-}
-
-void ClAYGDecoder::merge(const vector<DecodingGraphEdge::FusionEdge>& fusion_edges)
-{
-    for (const auto& fusion_edge : fusion_edges)
-    {
-        auto tree_node = fusion_edge.tree_node;;
-        // assert that tree node has cluster
-        assert(tree_node->cluster().has_value());
-        auto leaf_node = fusion_edge.leaf_node;
-
-        auto cluster = tree_node->cluster().value().lock();
-        auto other_cluster_optional = leaf_node->cluster();
-
-        if (!other_cluster_optional.has_value())
-        {
-            // node is not part of another cluster
-            cluster->add_node(leaf_node);
-            if (leaf_node->marked())
-                cluster->add_marked_node(leaf_node);
-            if (leaf_node->id().type == DecodingGraphNode::VIRTUAL)
-                cluster->add_virtual_node(leaf_node);
-
-            cluster->add_bulk_edge(fusion_edge.edge);
-            for (const auto& edge_weak_ptr : leaf_node->edges())
-            {
-                auto edge = edge_weak_ptr.lock();
-                if (edge != fusion_edge.edge)
-                {
-                    cluster->add_boundary_edge(Cluster::BoundaryEdge{
-                        leaf_node,
-                        edge->other_node(leaf_node).lock(),
-                        edge
-                    });
-                }
-            }
-            leaf_node->set_cluster(cluster);
-            continue;
-        }
-
-        auto other_cluster = other_cluster_optional.value().lock();
-
-        if (other_cluster == cluster)
-        {
-            continue;
-        }
-
-        for (const auto& node : other_cluster->nodes())
-        {
-            cluster->add_node(node);
-            if (node->id().type == DecodingGraphNode::VIRTUAL)
-            {
-                cluster->add_virtual_node(node);
-            }
-            if (node->marked())
-            {
-                cluster->add_marked_node(node);
-            }
-            node->set_cluster(cluster);
-        }
-        for (const auto& edge : other_cluster->edges())
-        {
-            cluster->add_bulk_edge(edge);
-        }
-        for (const auto& boundary : other_cluster->boundary())
-        {
-            cluster->add_boundary_edge(boundary);
-        }
-
-        if (cluster->is_neutral())
-            cluster->set_has_been_neutral_since(current_round_);
-
-        auto cluster_to_be_removed = find(m_clusters.begin(), m_clusters.end(), other_cluster);
-        if (cluster_to_be_removed != m_clusters.end())
-            m_clusters.erase(cluster_to_be_removed);
     }
 }
