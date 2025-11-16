@@ -3,6 +3,7 @@
 //
 
 #include <cmath>
+#include <utility>
 
 #include "ClAYGDecoder.h"
 #include "Logger.h"
@@ -10,7 +11,7 @@
 
 using namespace std;
 
-ClAYGDecoder::ClAYGDecoder(std::unordered_map<std::string, std::string> args)
+ClAYGDecoder::ClAYGDecoder(const std::unordered_map<std::string, std::string>& args)
     : UnionFindDecoder(args)
 {
     this->decoder_name_.replace(0, 2, "clayg");
@@ -44,10 +45,7 @@ DecodingResult ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
         vector<shared_ptr<DecodingGraphNode>> nodes;
         for (const auto& node : marked_nodes_by_round[current_round_])
         {
-            if (node->id().round == current_round_)
-            {
-                add(decoding_graph_, node);
-            }
+            add(decoding_graph_, node);
         }
         auto new_error_edges = clean(decoding_graph_);
         logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
@@ -198,31 +196,36 @@ vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::clean(const shared_ptr<Decod
     return error_edges;
 }
 
+SingleLayerClAYGDecoder::SingleLayerClAYGDecoder(const std::unordered_map<std::string, std::string>& args)
+        : ClAYGDecoder(args)
+{
+    decoder_name_ = "sl_" + decoder_name_;
+    // FIXME: Should be optional!
+    decoding_graph_ = nullptr;
+}
+
 DecodingResult SingleLayerClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
 {
-    vector<shared_ptr<DecodingGraphNode>> marked_nodes;
-
-    for (const auto& node : graph->nodes())
-    {
-        if (node->marked())
-        {
-            marked_nodes.push_back(node);
-        }
-    }
-
-    sort(marked_nodes.begin(), marked_nodes.end(), [](const auto& node1, const auto& node2)
-    {
-        if (node1->id().round == node2->id().round)
-        {
-            return node1->id().id < node2->id().id;
-        }
-        return node1->id().round < node2->id().round;
-    });
+    auto marked_nodes_by_round = graph->marked_nodes_by_round();
 
     const int rounds = graph->t();
-    if (decoding_graph_->d() != graph->d())
+    if (!decoding_graph_ || decoding_graph_->d() != graph->d())
     {
-        decoding_graph_ = DecodingGraph::rotated_surface_code(graph->d(), 1);
+        if (graph->code_name() == "rotated_surface_code")
+        {
+            decoding_graph_ = DecodingGraph::rotated_surface_code(graph->d(), 1);
+        } else if (graph->code_name() == "surface_code")
+        {
+            decoding_graph_ = DecodingGraph::surface_code(graph->d(), 1);
+        }
+        else if (graph->code_name() == "repetition_code")
+        {
+            decoding_graph_ = DecodingGraph::repetition_code(graph->d(), 1);
+        }
+        else
+        {
+            throw runtime_error("SingleLayerClAYGDecoder: Unsupported code type " + decoding_graph_->code_name());
+        }
     }
     else
     {
@@ -239,22 +242,12 @@ DecodingResult SingleLayerClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
     for (current_round_ = 0; current_round_ < rounds; current_round_++)
     {
         last_growth_steps_ = ceil(last_growth_steps_);
-        vector<shared_ptr<DecodingGraphNode>> nodes;
-        for (const auto& node : marked_nodes)
-        {
-            if (node->id().round == current_round_ && node->marked())
-            {
-                nodes.push_back(node);
-            }
-        }
-        int added_nodes = 0;
-        for (const auto& node : nodes)
+        for (const auto& node : marked_nodes_by_round[current_round_])
         {
             add(decoding_graph_, node);
-            added_nodes++;
         }
         auto new_error_edges = clean(decoding_graph_);
-        logger.log_decoding_step(m_clusters, decoder_name_, step++);
+        logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
         error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
         // Growth after adding last round belongs to the bulk growth
         if (current_round_ == rounds-1)
@@ -271,11 +264,9 @@ DecodingResult SingleLayerClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
                     fusion_edges.push_back(fusion_edge);
                 }
             }
-            if (Logger::instance().is_dump_enabled())
-            {
-                logger.log_decoding_step(m_clusters, decoder_name_, step++);
-            }
+            logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
             merge(fusion_edges);
+            logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
             last_growth_steps_ += 1.0/growth_rounds_;
             if (stop_early_ && Cluster::all_clusters_are_neutral(m_clusters))
             {
@@ -284,6 +275,7 @@ DecodingResult SingleLayerClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
         }
         new_error_edges = clean(decoding_graph_);
         error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
+        logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
         if (stop_early_ && Cluster::all_clusters_are_neutral(m_clusters))
         {
             if (current_round_-last_encountered_non_neutral_cluster >= (decoding_graph_->d()-1)/2)
@@ -311,13 +303,14 @@ DecodingResult SingleLayerClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
                 fusion_edges.push_back(fusion_edge);
             }
         }
-        logger.log_decoding_step(m_clusters, decoder_name_, step++);
+        logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
         merge(fusion_edges);
+        logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
     }
 
     auto new_error_edges = clean(decoding_graph_);
     error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
-
+    logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
     return {error_edges, considered_up_to_round};
 }
 

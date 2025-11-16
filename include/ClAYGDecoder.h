@@ -12,14 +12,14 @@
 
 // ClAYGDecoder inherits from UnionFind
 // It owns the clusters and the graph, but not its constituents
-class ClAYGDecoder : public virtual UnionFindDecoder {
+class ClAYGDecoder : public UnionFindDecoder {
 protected:
     int growth_rounds_ = 1;
     int current_round_ = 0;
     double cluster_lifetime_factor_ = 0;
     std::shared_ptr<DecodingGraph> decoding_graph_;
 public:
-    explicit ClAYGDecoder(std::unordered_map<std::string, std::string> args = {});
+    explicit ClAYGDecoder(const std::unordered_map<std::string, std::string>& args = {});
 
     DecodingResult decode(std::shared_ptr<DecodingGraph> graph) override;
 
@@ -34,16 +34,10 @@ public:
     void set_cluster_lifetime_factor(const double life_time) { cluster_lifetime_factor_ = life_time; }
 };
 
-class SingleLayerClAYGDecoder : public virtual ClAYGDecoder
+class SingleLayerClAYGDecoder : public ClAYGDecoder
 {
 public:
-    explicit SingleLayerClAYGDecoder(std::unordered_map<std::string, std::string> args = {})
-        : ClAYGDecoder(std::move(args))
-    {
-        decoder_name_ = "sl_" + decoder_name_;
-        // FIXME: Should be optional!
-        decoding_graph_ = nullptr;
-    }
+    explicit SingleLayerClAYGDecoder(const std::unordered_map<std::string, std::string>& args = {});
 
     DecodingResult decode(std::shared_ptr<DecodingGraph> graph) override;
 

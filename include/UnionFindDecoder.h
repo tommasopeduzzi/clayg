@@ -11,7 +11,7 @@
 #include "DecodingGraph.h"
 #include "Decoder.h"
 
-class UnionFindDecoder : public virtual Decoder
+class UnionFindDecoder : public Decoder
 {
 protected:
     std::vector<std::shared_ptr<Cluster>> m_clusters;
@@ -25,7 +25,7 @@ protected:
 
 
 public:
-    explicit UnionFindDecoder(std::unordered_map<std::string, std::string> args = {});
+    explicit UnionFindDecoder(const std::unordered_map<std::string, std::string>& args = {});
 
     DecodingResult decode(std::shared_ptr<DecodingGraph> graph) override;
 

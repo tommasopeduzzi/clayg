@@ -19,7 +19,7 @@ struct DecodingResult {
 
 class Decoder {
 public:
-    explicit Decoder(const std::unordered_map<std::string, std::string>& args = {}) {};
+    explicit Decoder(const std::unordered_map<std::string, std::string>& = {}) { };
 
     virtual ~Decoder() = default;
 

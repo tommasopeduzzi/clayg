@@ -10,7 +10,8 @@
 
 using namespace std;
 
-UnionFindDecoder::UnionFindDecoder(std::unordered_map<std::string, std::string> args)
+UnionFindDecoder::UnionFindDecoder(const std::unordered_map<std::string, std::string>& args)
+    : Decoder(args)
 {
     decoder_name_ = "uf";
 
