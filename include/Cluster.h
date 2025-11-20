@@ -28,7 +28,7 @@ private:
     std::vector<std::shared_ptr<DecodingGraphNode>> m_nodes;
     std::vector<std::shared_ptr<DecodingGraphNode>> m_marked_nodes;
     std::vector<std::shared_ptr<DecodingGraphNode>> m_virtual_nodes;
-    std::set<std::shared_ptr<DecodingGraphEdge>> m_bulk_edges;
+    std::vector<std::shared_ptr<DecodingGraphEdge>> m_bulk_edges;
     std::vector<BoundaryEdge> m_boundary;
 
     int m_has_been_neutral_since = -1;
@@ -58,7 +58,7 @@ public:
 
     void add_bulk_edge(const std::shared_ptr<DecodingGraphEdge>& edge)
     {
-        m_bulk_edges.insert(edge);
+        m_bulk_edges.push_back(edge);
     }
 
     void add_boundary_edge(const BoundaryEdge& boundary_edge)
@@ -71,7 +71,7 @@ public:
     std::vector<std::shared_ptr<DecodingGraphNode>> nodes() { return m_nodes; }
     std::vector<std::shared_ptr<DecodingGraphNode>> marked_nodes() { return m_marked_nodes; }
 
-    std::set<std::shared_ptr<DecodingGraphEdge>> edges() { return m_bulk_edges; }
+    std::vector<std::shared_ptr<DecodingGraphEdge>> edges() { return m_bulk_edges; }
 
     std::vector<BoundaryEdge> boundary() { return m_boundary; }
     void set_boundary(const std::vector<BoundaryEdge>& boundary) { m_boundary = boundary; }

@@ -60,7 +60,7 @@ public:
 
 private:
     bool dump_enabled = false;
-    std::string run_id = 0;
+    std::string run_id;
     std::string dump_dir_ = "data/runs";
     std::string results_dir_ = "data/results";
     int distance_ = -1;
