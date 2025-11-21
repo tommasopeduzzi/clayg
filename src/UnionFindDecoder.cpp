@@ -79,9 +79,10 @@ DecodingResult UnionFindDecoder::decode(const shared_ptr<DecodingGraph> graph)
         }
     }
 
-    int steps = 0;
+    last_growth_steps_ = 0;
+    int log_steps = 0;
     // Main Union Find loop
-    logger.log_decoding_step(m_clusters, decoder_name_, steps++, consider_up_to_round_);
+    logger.log_decoding_step(m_clusters, decoder_name_, log_steps++, consider_up_to_round_);
     while (!Cluster::all_clusters_are_neutral(m_clusters))
     {
         graph->node(DecodingGraphNode::Id{DecodingGraphNode::ANCILLA, 4, 2});
@@ -94,14 +95,14 @@ DecodingResult UnionFindDecoder::decode(const shared_ptr<DecodingGraph> graph)
                 fusion_edges.push_back(fusion_edge);
             }
         }
-        logger.log_decoding_step(m_clusters, decoder_name_, steps++, consider_up_to_round_);
+        logger.log_decoding_step(m_clusters, decoder_name_, log_steps++, consider_up_to_round_);
         merge(fusion_edges);
-        logger.log_decoding_step(m_clusters, decoder_name_, steps++, consider_up_to_round_);
+        logger.log_decoding_step(m_clusters, decoder_name_, log_steps++, consider_up_to_round_);
+        last_growth_steps_++;
     }
-    last_growth_steps_ = steps;
     auto peeling_decoder_results = PeelingDecoder::decode(m_clusters, graph);
     // Log after peeling (no more clusters)
-    logger.log_decoding_step({}, decoder_name_, steps++, consider_up_to_round_);
+    logger.log_decoding_step({}, decoder_name_, log_steps++, consider_up_to_round_);
     return {peeling_decoder_results.corrections, consider_up_to_round_};
 }
 

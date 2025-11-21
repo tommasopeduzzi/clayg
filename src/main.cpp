@@ -289,7 +289,7 @@ int main(int argc, char* argv[])
     vector<shared_ptr<Decoder>> decoders;
     for (auto& [decoder_name, decoder_args] : parsed_decoders) {
         if (decoder_name == "uf" || decoder_name == "unionfind") {
-            decoders.push_back(make_shared<UnionFindDecoder>());
+            decoders.push_back(make_shared<UnionFindDecoder>(decoder_args));
         } else if (decoder_name == "clayg") {
             decoders.push_back(make_shared<ClAYGDecoder>(decoder_args));
         } else if (decoder_name == "single_layer_clayg" || decoder_name == "sl_clayg") {
