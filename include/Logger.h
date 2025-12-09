@@ -27,9 +27,8 @@ public:
     void log_errors(const std::vector<DecodingGraphEdge::Id>& error_ids) const;
     void log_corrections(const std::vector<DecodingGraphEdge::Id>& correction_ids, const std::string& decoder) const;
     void log_results_entry(double logical_error_rate, int runs, double p, double idling_time_constant, const std::string& decoder_name);
+    void log_idling_entry(double p_idling, int runs, double p, double idling_time_constant, const std::string& decoder_name);
     void log_growth_steps(double p, const std::map<double, int>& frequencies, const std::string& decoder_name);
-    void prepare_results_file(const std::string& decoder_name);
-    void prepare_steps_file(const std::string& decoder_name);
     void prepare_dump_dir() const;
 
     // Dump flag management

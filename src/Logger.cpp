@@ -147,21 +147,6 @@ void Logger::log_corrections(const std::vector<DecodingGraphEdge::Id>& correctio
     write_to_file(filename, content.str(), false);
 }
 
-void Logger::prepare_results_file(const std::string& decoder_name) {
-    std::filesystem::create_directories(results_dir_ + "/steps");
-    std::string filename;
-    if (distance_ > 0) {
-        filename = results_dir_ + "/results/" + decoder_name + "_d=" + std::to_string(distance_) + ".txt";
-    } else {
-        filename = results_dir_ + "/results/" + decoder_name + ".txt";
-    }
-}
-
-void Logger::prepare_steps_file(const std::string& decoder_name) {
-    std::filesystem::create_directories(results_dir_ + "/results");
-}
-
-
 void Logger::prepare_dump_dir() const {
     if (!dump_enabled) return;
     const std::string run_dir = dump_dir_ + "/" + run_id;
@@ -178,7 +163,6 @@ int Logger::get_distance() const {
 }
 
 void Logger::log_results_entry(double logical_error_rate, int runs, double p,  double idling_time_constant, const std::string& decoder_name) {
-    std::filesystem::create_directories(results_dir_);
     std::string filename = results_dir_ + "/results/"+ decoder_name + "_";
     if (distance_ > 0) {
         filename += "d=" + std::to_string(distance_) + "_";
@@ -196,8 +180,25 @@ void Logger::log_results_entry(double logical_error_rate, int runs, double p,  d
     write_to_file(filename, line.str(), true);
 }
 
+void Logger::log_idling_entry(double logical_error_rate, int runs, double p,  double idling_time_constant, const std::string& decoder_name) {
+    std::string filename = results_dir_ + "/idling/"+ decoder_name + "_";
+    if (distance_ > 0) {
+        filename += "d=" + std::to_string(distance_) + "_";
+    }
+    if (idling_time_constant > 0.0)
+    {
+        filename += "idlingtimeconstant=" + std::to_string(idling_time_constant) + "_";
+    }
+    if (filename.back() == '_') {
+        filename.pop_back(); // remove trailing underscore
+    }
+    filename += ".txt";
+    std::ostringstream line;
+    line << p << "\t" << logical_error_rate << "\t" << runs << "\n";
+    write_to_file(filename, line.str(), true);
+}
+
 void Logger::log_growth_steps(double p, const std::map<double, int>& frequencies, const std::string& decoder_name) {
-    std::filesystem::create_directories(results_dir_);
     std::string filename;
     if (distance_ > 0) {
         filename = results_dir_ + "/steps/" + decoder_name + "_d=" +
@@ -228,6 +229,9 @@ Logger& Logger::instance() {
 
 void Logger::set_results_dir(const std::string& dir) {
     results_dir_ = dir;
+    std::filesystem::create_directories(results_dir_ + "/results");
+    std::filesystem::create_directories(results_dir_ + "/idling");
+    std::filesystem::create_directories(results_dir_ + "/steps");
 }
 
 void Logger::set_dump_dir(const std::string& dir) {
