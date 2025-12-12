@@ -60,8 +60,7 @@ category = config.get("Category", "new")
 mode = config.get("Mode", "").lower()
 probabilities_str = config.get("Probabilities", "")
 if not mode:
-    # Automatically detect mode
-    mode = "steps" if probabilities_str else "results"
+    mode = "probabilities_list" if probabilities_str else "p_step"
 
 probabilities = probabilities_str if probabilities_str else [0.001, 0.005, 0.01]
 p_start = float(config.get("P Start", "0.035"))
@@ -74,25 +73,59 @@ idling_step = config.get("Idling Time Constant Step", "+0.005")
 
 runs = int(config.get("Runs", "100000"))
 dump = config.get("Dump", "false")
-base_dir = config.get("Results Directory", "data/results_new")
+base_dir = config.get("Results Directory", "data/no_category")
 
 # --- Generate params lines ---
 lines = []
-if mode == "steps":
-    directory = f"steps_{category}"
+if mode == "probabilties_list":
     for d in distances:
         for p in probabilities:
             lines.append(
-                f"{decoders} {d} {runs} {base_dir}/{directory} {p} {p} *1.2 "
+                f"{decoders} {d} {runs} {base_dir}/{category} {p} {p} *1.2 "
                 f"{idling_start} {idling_end} {idling_step}\n"
             )
-else:  # results mode
-    directory = f"results_{category}"
+elif mode== "split_p_steps":
+        all_ps = []
+        p = p_start
+        
+        apply_step = lambda val, step: (
+            val + float(step[1:]) if step[0] == '+'
+            else val - float(step[1:]) if step[0] == '-'
+            else val * float(step[1:]) if step[0] == '*'
+            else val / float(step[1:]) if step[0] == '/'
+            else (lambda inv: 1.0 / inv)(1.0 / val + float(step[1:])) if step[0] == '#'
+            else (_ for _ in ()).throw(ValueError(f"Unknown step operator: {step[0]}"))
+        )
+
+        if p_start > p_end:
+            cmp = lambda x: x >= p_end
+        else:
+            cmp = lambda x: x <= p_end
+            
+        while cmp(p):
+            all_ps.append(p)
+            p = apply_step(p, p_step)
+
+        def chunk_list(lst, n):
+            for i in range(0, len(lst), n):
+                yield lst[i], lst[min(len(lst)-1, i+n-1)]
+            
+        chunks = list(chunk_list(all_ps, 2))
+
+        for d in distances:
+            for chunk_start, chunk_end in chunks:
+                lines.append(
+                    f"{decoders} {d} {runs} {base_dir}/{category} {chunk_start} {chunk_end} {p_step} "
+                    f"{idling_start} {idling_end} {idling_step}\n"
+                )
+elif mode == "p_step":
     for d in distances:
         lines.append(
-            f"{decoders} {d} {runs} {base_dir}/{directory} {p_start} {p_end} {p_step} "
+            f"{decoders} {d} {runs} {base_dir}/{category} {p_start} {p_end} {p_step} "
             f"{idling_start} {idling_end} {idling_step}\n"
         )
+else:
+    raise ValueError(f"Unknown mode: {mode}")
 
 # --- Write params.txt ---
 with open(PARAM_FILE, "w") as f:

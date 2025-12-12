@@ -12,7 +12,7 @@ CLAYG_EXEC="$CWD/../build/clayg"
 PARAM_FILE="$CWD/params.txt"
 
 LINE=$(sed -n "$((SLURM_ARRAY_TASK_ID + 1))p" "$PARAM_FILE")
-read -r DECODERS DIST RUNS BASE_DIR P_START P_END P_STEP IDL_START IDL_END IDL_STEP <<< "$LINE"
+read -r DECODERS DIST RUNS_P RUNS_IDLING BASE_DIR P_START P_END P_STEP IDL_START IDL_END IDL_STEP <<< "$LINE"
 echo "$LINE"
 
 timestamp=$(date +%F_%H-%M-%S)
@@ -24,4 +24,4 @@ echo "[$SLURM_ARRAY_TASK_ID] D=$DIST, (prob $P_START→$P_END $P_STEP) (idling $
 "$CLAYG_EXEC" "$DIST" "$DIST" "$DECODERS" "$OUTPUT_DIR" \
     --p_start "${P_START}" --p_end "${P_END}" --p_step "${P_STEP}" \
     --idling_time_constant_start "$IDL_START" --idling_time_constant_end "$IDL_END" --idling_time_constant_step "$IDL_STEP" \
-    --dump false --runs "$RUNS"
+    --dump false --runs_p "$RUNS_P" --runs_idling "$RUNS_IDLING"

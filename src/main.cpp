@@ -94,7 +94,8 @@ unordered_map<string, string> parse_args(int argc, char* argv[]) {
             if (v != "true" && v != "false")
                 throw invalid_argument("must be true or false");
         }},
-        {"runs", "10000", [](const string& v){ stoi(v); }},
+        {"runs_p", "10000", [](const string& v){ stoi(v); }},
+        {"runs_idling", "10000", [](const string& v){ stoi(v); }},
     };
 
     unordered_set<string> known_keys;
@@ -278,7 +279,8 @@ int main(int argc, char* argv[])
     string results_file_path = args["results"];
     bool dump = string(args["dump"]) == "true";
     logger.set_dump_enabled(dump);
-    int runs = stoi(args["runs"]);
+    int runs_p = stoi(args["runs_p"]);
+    int runs_idling = stoi(args["runs_idling"]);
 
     // Parse decoders argument (comma-separated)
     vector<string> decoder_names;
@@ -330,23 +332,23 @@ int main(int argc, char* argv[])
 
     do
     {
-        // decoder name -> idling time constant -> total logical errors
-        map<string, map<double, int>> errors;
-        // decoder nme -> idling time constant -> (p_idling_sum, count)
-        struct idling_stats {
-            double rolling_p_idling_sum = 0.0;
+        struct stats {
+            double rolling_sum = 0.0;
             int count = 0;
         };
-        map<string, map<double, idling_stats>> idling;
+        // decoder name -> idling time constant -> total logical errors
+        map<string, map<double, stats>> errors;
+        // decoder nme -> idling time constant -> (p_idling_sum, count)
+        map<string, map<double, stats>> idling;
         map<string, map<double, int>> growth_steps;
         for (const auto& decoder : decoders) {
             errors[decoder->decoder_name()] = {};
             // always compute for idling time constant 0.0 for last three corrected runs condition
-            errors[decoder->decoder_name()][0.0] = 0;
+            errors[decoder->decoder_name()][0.0] = {0, 0};
             auto idling_time_constant = idling_time_constant_start;
             while (!increment_end_condition(idling_time_constant, idling_time_constant_start, idling_time_constant_end))
             {
-                errors[decoder->decoder_name()][idling_time_constant] = 0;
+                errors[decoder->decoder_name()][idling_time_constant] = {0, 0};
                 idling[decoder->decoder_name()][idling_time_constant] = {0.0, 0};
                 increment_by_step(idling_time_constant, idling_time_constant_step);
             }
@@ -356,7 +358,7 @@ int main(int argc, char* argv[])
         const std::string run_id_prefix = "d=" + std::to_string(D) + "_p=" + format("{:.5f}", p) + "_run=";
         int dumped_runs = 0;
         logger.set_run_id(run_id_prefix + std::to_string(dumped_runs));
-        for (int i = 0; i < runs; i++)
+        for (int i = 0; i < runs_p; i++)
         {
             logger.prepare_dump_dir();
             error_edge_ids = generate_errors(D, T, p, dis, gen);
@@ -390,7 +392,8 @@ int main(int argc, char* argv[])
                 int num_growth_steps = decoder->get_last_growth_steps();
                 growth_steps[decoder->decoder_name()][num_growth_steps] += 1;
 
-                errors[decoder->decoder_name()][0.0] += logical_after_decoding;
+                errors[decoder->decoder_name()][0.0].rolling_sum += logical_after_decoding;
+                errors[decoder->decoder_name()][0.0].count += 1;
 
                 double idling_time_constant = idling_time_constant_start;
                 while (!increment_end_condition(idling_time_constant, idling_time_constant_start, idling_time_constant_end))
@@ -401,20 +404,24 @@ int main(int argc, char* argv[])
                         continue;
                     }
                     double p_idling = 0.5 * (1-exp(-(num_growth_steps/idling_time_constant)));
-                    idling[decoder->decoder_name()][idling_time_constant].rolling_p_idling_sum += p_idling;
+                    idling[decoder->decoder_name()][idling_time_constant].rolling_sum += p_idling;
                     idling[decoder->decoder_name()][idling_time_constant].count += 1;
-                    auto idling_error_edge_ids = generate_errors(D, 1, p_idling, dis, gen);
-                    auto idling_error_edges = vector<shared_ptr<DecodingGraphEdge>>{};
-                    for (auto id : idling_error_edge_ids)
+                    for (int run_idling = 0; run_idling < runs_idling; run_idling++)
                     {
-                        auto edge = graph->edge(id).value();
-                        idling_error_edges.push_back(edge);
+                        auto idling_error_edge_ids = generate_errors(D, 1, p_idling, dis, gen);
+                        auto idling_error_edges = vector<shared_ptr<DecodingGraphEdge>>{};
+                        for (auto id : idling_error_edge_ids)
+                        {
+                            auto edge = graph->edge(id).value();
+                            idling_error_edges.push_back(edge);
+                        }
+                        int logical_after_idling = compute_logical(logical_after_decoding, logical_edge_ids, {
+                            idling_error_edges,
+                            decoding_results.considered_up_to_round
+                        });
+                        errors[decoder->decoder_name()][idling_time_constant].rolling_sum += logical_after_idling;
+                        errors[decoder->decoder_name()][idling_time_constant].count += 1;
                     }
-                    int logical_after_idling = compute_logical(logical_after_decoding, logical_edge_ids, {
-                        idling_error_edges,
-                        decoding_results.considered_up_to_round
-                    });
-                    errors[decoder->decoder_name()][idling_time_constant] += logical_after_idling;
                     increment_by_step(idling_time_constant, idling_time_constant_step);
                 }
             }
@@ -423,19 +430,19 @@ int main(int argc, char* argv[])
                 dumped_runs += 1;
                 logger.set_run_id(run_id_prefix + std::to_string(dumped_runs));
             }
-            Logger::log_progress(i + 1, runs, p, D);
+            Logger::log_progress(i + 1, runs_p, p, D);
         }
         // Log results and average growth steps for each decoder
         results.push_back({p, {}});
         for (const auto& decoder : decoders) {
-            for (const auto& [idling_time_constant, logical_errors] : errors[decoder->decoder_name()]) {
-                double logical_error_rate = static_cast<double>(logical_errors) / runs;
-                logger.log_results_entry(logical_error_rate, runs, p,  idling_time_constant, decoder->decoder_name());
+            for (const auto& [idling_time_constant, stats] : errors[decoder->decoder_name()]) {
+                double logical_error_rate = static_cast<double>(stats.rolling_sum) / stats.count;
+                logger.log_results_entry(logical_error_rate, stats.count, p,  idling_time_constant, decoder->decoder_name());
                 if (idling_time_constant == 0.0)
                     results.back().second[decoder->decoder_name()] = logical_error_rate;
             }
             for (const auto& [idling_time_constant, stats] : idling[decoder->decoder_name()]) {
-                double average_p_idling = stats.rolling_p_idling_sum / stats.count;
+                double average_p_idling = stats.rolling_sum / stats.count;
                 logger.log_idling_entry(average_p_idling, stats.count, p, idling_time_constant, decoder->decoder_name());
             }
             logger.log_growth_steps(p, growth_steps[decoder->decoder_name()], decoder->decoder_name());

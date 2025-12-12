@@ -1,20 +1,27 @@
 {
-  "Mode": "results",
-  "D": [6, 8, 10, 12, 14, 16],
+  "Mode": "p_step",
+  "D": [6, 8, 10, 12, 14, 16, 18],
   "Decoders": {
-    "uf": {},
+    "uf": {
+    	"stop_early": ["true", "false"]
+    },
     "clayg": {
-      "cluster_lifetime": [0.0, 0.25, 0.5 0.75, 1.0]
+    	"cluster_lifetime": [0.0, 0.25, 0.5, 2.0],
+    	"stop_early": ["true", "false"]
+    },
+    "sl_clayg": {
+    	"cluster_lifetime": [0.0, 0.25, 0.5, 2.0],
+    	"stop_early": ["true", "false"]
     }
   },
-  "Category": "test_new",
-  "Results Directory": "data/test_new",
-  "P Start": 0.005,
-  "P End": 0.01,
-  "P Step": "+0.005",
-  "Idling Time Constant Start": 0.005,
-  "Idling Time Constant End": 0.01,
-  "Idling Time Constant Step": "+0.005",
-  "Runs": 100,
+  "Category": "threshold",
+  "Results Directory": "data/PAPER",
+  "P Start": 0.03169,
+  "P End": 0.03169,
+  "P Step": "*1.28",
+  "Idling Time Constant Start": 0,
+  "Idling Time Constant End": 0,
+  "Idling Time Constant Step": "*1.5",
+  "Runs_P": 100000,
   "Dump": false
 }
