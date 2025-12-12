@@ -14,7 +14,7 @@ using namespace std;
 
 int main()
 {
-    int D = 10;
+    int D = 6;
     vector<pair<string, unordered_map<string, string>>> decoder_constructors = {
         {"clayg", {}},
         {"clayg", {{"cluster_lifetime", "2"}}},
@@ -24,8 +24,8 @@ int main()
         {"sl_clayg", {{"cluster_lifetime", "2"}}},
         {"sl_clayg", {{"stop_early", "true"}}},
         {"sl_clayg", {{"stop_early", "true"}, {"cluster_lifetime", "2"}}},
-        {"uf", {}},
         {"uf", {{"stop_early", "true"}}},
+        {"uf", {{"stop_early", "false"}}},
     };
     vector<shared_ptr<Decoder>> decoders;
     for (auto& [decoder_name, args] : decoder_constructors)
@@ -42,10 +42,10 @@ int main()
 
     shared_ptr<DecodingGraph> decoding_graph = DecodingGraph::repetition_code(D, D);
 
-    logger.set_dump_dir("data/diagrams");
+    logger.set_dump_dir("data/diagrams/explanations");
     logger.set_dump_enabled(true);
 
-    variant<string, int> run_id = "d=10";
+    variant<string, int> run_id = "d=6";
     auto next_run_id = [](variant<string, int> current_run_id) {
         if (holds_alternative<string>(current_run_id))
             return false;
@@ -64,9 +64,7 @@ int main()
     vector<DecodingGraphEdge::Id> fixed_error_ids = {
         {DecodingGraphEdge::Type::NORMAL, 1,1},
         {DecodingGraphEdge::Type::MEASUREMENT, 2,1},
-        {DecodingGraphEdge::Type::MEASUREMENT, 3,2},
-        {DecodingGraphEdge::Type::MEASUREMENT, 4,3},
-        {DecodingGraphEdge::Type::MEASUREMENT, 5,4},
+        {DecodingGraphEdge::Type::NORMAL, 4,4},
     };
 
     do {

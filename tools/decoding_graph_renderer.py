@@ -821,6 +821,7 @@ def main():
     parser.add_argument('--decoder', help='Decoder for which to show clustering.')
     parser.add_argument('--steps', help='Directory containing cluster step files', default=None)
     parser.add_argument("--corrections_file", help="File containing corrections by decoder")
+    parser.add_argument('--animation', help='If set, exports each cluster step as an image to directory specified or default.', action='store_true')
     parser.add_argument('--animation_dir', help='If set, exports each cluster step as an image to this directory', default=None)
     args = parser.parse_args()
 
@@ -837,9 +838,11 @@ def main():
     visualizer = GraphVisualizer3D(args.graph_file, args.errors_file, step_dir=args.steps,
                                    corrections_file=args.corrections_file)
     # --- Export mode: save images for each cluster step instead of interactive display ---
-    if args.animation_dir and args.decoder and args.steps and visualizer.decoding_steps:
-        os.makedirs(args.animation_dir, exist_ok=True)
-        visualizer.save_clustering_animation(args.animation_dir, make_comic=True)
+    if args.animation and args.decoder and args.steps and visualizer.decoding_steps:
+        animation_dir = args.animation_dir if args.animation_dir else f"{args.directory}/{args.run_id}/{args.decoder}/animation"
+        print(animation_dir)
+        os.makedirs(animation_dir, exist_ok=True)
+        visualizer.save_clustering_animation(animation_dir, make_comic=True)
         sys.exit(0)
         
     # Create check buttons.
