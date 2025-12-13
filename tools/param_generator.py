@@ -71,7 +71,8 @@ idling_start = config.get("Idling Time Constant Start", "0.005")
 idling_end = config.get("Idling Time Constant End", "0.01")
 idling_step = config.get("Idling Time Constant Step", "+0.005")
 
-runs = int(config.get("Runs", "100000"))
+runs_p = int(config.get("Runs_P", "100000"))
+runs_idling = int(config.get("Runs_P", "100000"))
 dump = config.get("Dump", "false")
 base_dir = config.get("Results Directory", "data/no_category")
 
@@ -81,7 +82,7 @@ if mode == "probabilties_list":
     for d in distances:
         for p in probabilities:
             lines.append(
-                f"{decoders} {d} {runs} {base_dir}/{category} {p} {p} *1.2 "
+                f"{decoders} {d} {runs_p} {runs_idling} {base_dir}/{category} {p} {p} *1.2 "
                 f"{idling_start} {idling_end} {idling_step}\n"
             )
 elif mode== "split_p_steps":
@@ -115,13 +116,13 @@ elif mode== "split_p_steps":
         for d in distances:
             for chunk_start, chunk_end in chunks:
                 lines.append(
-                    f"{decoders} {d} {runs} {base_dir}/{category} {chunk_start} {chunk_end} {p_step} "
+                    f"{decoders} {d} {runs_p} {runs_idling} {base_dir}/{category} {chunk_start} {chunk_end} {p_step} "
                     f"{idling_start} {idling_end} {idling_step}\n"
                 )
 elif mode == "p_step":
     for d in distances:
         lines.append(
-            f"{decoders} {d} {runs} {base_dir}/{category} {p_start} {p_end} {p_step} "
+            f"{decoders} {d} {runs_p} {runs_idling} {base_dir}/{category} {p_start} {p_end} {p_step} "
             f"{idling_start} {idling_end} {idling_step}\n"
         )
 else:
