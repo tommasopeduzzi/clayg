@@ -71,10 +71,59 @@ idling_start = config.get("Idling Time Constant Start", "0.005")
 idling_end = config.get("Idling Time Constant End", "0.01")
 idling_step = config.get("Idling Time Constant Step", "+0.005")
 
-runs_p = int(config.get("Runs_P", "100000"))
-runs_idling = int(config.get("Runs_P", "100000"))
+runs_p = config.get("Runs_P", "auto")
+runs_idling = config.get("Runs_P", "auto")
 dump = config.get("Dump", "false")
 base_dir = config.get("Results Directory", "data/no_category")
+
+# parameter ranges
+P_MIN, P_MAX = 0.005, 0.02
+IDLE_MIN, IDLE_MAX = 200, 1_000_000
+
+def clamp(x, lo, hi):
+    return max(lo, min(hi, x))
+
+def norm(x, lo, hi):
+    return clamp((x - lo) / (hi - lo), 0.0, 1.0)
+
+def auto_runs_p(p, idling):
+    # lower p → more runs
+    p_norm = norm(p, P_MIN, P_MAX)
+
+    runs_min = 400_000
+    runs_max = 1_000_000
+        
+    # power > 1 gives more weight to small p
+    runs = runs_max * (1 - p_norm) ** 2
+    return int(clamp(runs, runs_min, runs_max))
+
+
+def auto_runs_idling(p, idling):
+    # lower p and larger idling → more runs
+    p_norm = norm(p, P_MIN, P_MAX)
+    idling = 1/float(idling) 
+    idle_norm = norm(idling, 0, 1/IDLE_MIN)
+
+    runs_min = 1
+    runs_max = 500
+
+    difficulty = (1.0 - p_norm) ** 0.8 * idle_norm ** 3
+    print(f"p: {p}, idling: {idling}, p_norm: {p_norm}, idle_norm: {idle_norm}, difficulty: {difficulty}")
+    runs = runs_min + difficulty * (runs_max - runs_min)
+
+    return int(clamp(runs, runs_min, runs_max))
+
+# selection logic
+if runs_p == "auto":
+    runs_p = auto_runs_p
+else:
+    runs_p = lambda p, idling=None: int(runs_p)
+
+if runs_idling == "auto":
+    runs_idling = auto_runs_idling
+else:
+    runs_idling = lambda p, idling: int(runs_idling)
+
 
 # --- Generate params lines ---
 lines = []
@@ -82,7 +131,7 @@ if mode == "probabilties_list":
     for d in distances:
         for p in probabilities:
             lines.append(
-                f"{decoders} {d} {runs_p} {runs_idling} {base_dir}/{category} {p} {p} *1.2 "
+                f"{decoders} {d} {runs_p(p, idling_start)} {runs_idling(p, idling_start)} {base_dir}/{category} {p} {p} *1.2 "
                 f"{idling_start} {idling_end} {idling_step}\n"
             )
 elif mode== "split_p_steps":
@@ -116,13 +165,13 @@ elif mode== "split_p_steps":
         for d in distances:
             for chunk_start, chunk_end in chunks:
                 lines.append(
-                    f"{decoders} {d} {runs_p} {runs_idling} {base_dir}/{category} {chunk_start} {chunk_end} {p_step} "
+                    f"{decoders} {d} {runs_p(chunk_start, idling_start)} {runs_idling(chunk_start, idling_start)} {base_dir}/{category} {chunk_start} {chunk_end} {p_step} "
                     f"{idling_start} {idling_end} {idling_step}\n"
                 )
 elif mode == "p_step":
     for d in distances:
         lines.append(
-            f"{decoders} {d} {runs_p} {runs_idling} {base_dir}/{category} {p_start} {p_end} {p_step} "
+            f"{decoders} {d} {runs_p(p, idling_start)} {runs_idling(p, idling_start)} {base_dir}/{category} {p_start} {p_end} {p_step} "
             f"{idling_start} {idling_end} {idling_step}\n"
         )
 else:
