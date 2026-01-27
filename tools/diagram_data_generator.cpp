@@ -95,7 +95,7 @@ int main()
                 error_edges.push_back(decoding_graph->edge(error_id).value());
             decoding_graph->mark(error_edges);
 
-            auto [corrections, considered_up_to_round] = decoder->decode(decoding_graph);
+            auto [corrections, considered_up_to_round, decoding_steps] = decoder->decode(decoding_graph);
             vector<DecodingGraphEdge::Id> correction_ids;
             for (const auto& edge : corrections)
                 correction_ids.push_back(edge->id());
