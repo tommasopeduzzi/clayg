@@ -18,6 +18,15 @@ protected:
     int current_round_ = 0;
     double cluster_lifetime_factor_ = 0;
     std::shared_ptr<DecodingGraph> decoding_graph_;
+
+    [[nodiscard]] double growth_steps_fixed(const double current_growth_steps, const double peeling_growth_steps) const {
+        double growth_steps = current_growth_steps + peeling_growth_steps;
+        if (growth_steps > 0)
+            // Growth rounds < 0 are counted as 1/growth_rounds each (not relevant for statistics, just for reporting)
+                growth_steps *= growth_rounds_;
+        return growth_steps;
+    }
+
 public:
     explicit ClAYGDecoder(const std::unordered_map<std::string, std::string>& args = {});
 
@@ -25,7 +34,7 @@ public:
 
     void merge(const std::vector<DecodingGraphEdge::FusionEdge>& fusion_edges) override;
 
-    std::vector<std::shared_ptr<DecodingGraphEdge>> clean(const std::shared_ptr<DecodingGraph>& decoding_graph);
+    DecodingResult clean(const std::shared_ptr<DecodingGraph>& decoding_graph);
 
     virtual void add(const std::shared_ptr<DecodingGraph>& graph, std::shared_ptr<DecodingGraphNode> node);
 

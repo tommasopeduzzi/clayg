@@ -15,6 +15,7 @@
 struct DecodingResult {
     std::vector<std::shared_ptr<DecodingGraphEdge>> corrections;
     int considered_up_to_round;
+    double decoding_steps = 0;
 };
 
 class Decoder {

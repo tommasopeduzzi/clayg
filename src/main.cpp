@@ -389,7 +389,7 @@ int main(int argc, char* argv[])
                     uncorrected = true;
                 }
 
-                int num_growth_steps = decoder->get_last_growth_steps();
+                double num_growth_steps = decoding_results.decoding_steps;
                 growth_steps[decoder->decoder_name()][num_growth_steps] += 1;
 
                 errors[decoder->decoder_name()][0.0].rolling_sum += logical_after_decoding;

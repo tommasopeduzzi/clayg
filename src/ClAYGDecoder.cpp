@@ -38,18 +38,22 @@ DecodingResult ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
     int step = 0;
     int considered_up_to_round = rounds - 1;
     int last_encountered_non_neutral_cluster = 0;
-    last_growth_steps_ = -(rounds-1); // don't count last round as being negative
+    double growth_steps = -(rounds-1); // don't count last round as being negative
+    double max_growth_steps = growth_steps;
     for (current_round_ = 0; current_round_ < rounds; current_round_++)
     {
-        last_growth_steps_ = ceil(last_growth_steps_);
+        growth_steps = ceil(growth_steps);
         for (const auto& node : marked_nodes_by_round[current_round_])
         {
             add(decoding_graph_, node);
         }
-        auto new_error_edges = clean(decoding_graph_);
+        auto peeling_results = clean(decoding_graph_);
         logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
-        error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
+        error_edges.insert(error_edges.end(), peeling_results.corrections.begin(), peeling_results.corrections.end());
         // Growth after adding last round belongs to the bulk growth
+        double fixed_growth_steps = growth_steps_fixed(growth_steps,
+            peeling_results.decoding_steps/growth_rounds_);
+        max_growth_steps = max(max_growth_steps, fixed_growth_steps);
         if (current_round_ == rounds-1)
             break;
         for (int growth_round = 0; growth_round < growth_rounds_; growth_round++)
@@ -67,14 +71,19 @@ DecodingResult ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
             logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
             merge(fusion_edges);
             logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
-            last_growth_steps_ += (1.0/growth_rounds_);
+            growth_steps += (1.0/growth_rounds_);
             if (stop_early_ && Cluster::all_clusters_are_neutral(m_clusters))
             {
                 break;
             }
         }
-        new_error_edges = clean(decoding_graph_);
-        error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
+        peeling_results = clean(decoding_graph_);
+        error_edges.insert(error_edges.end(), peeling_results.corrections.begin(),
+            peeling_results.corrections.end());
+        fixed_growth_steps = growth_steps_fixed(growth_steps,
+            peeling_results.decoding_steps/growth_rounds_);
+        max_growth_steps = max(max_growth_steps, fixed_growth_steps);
+
         if (stop_early_ && Cluster::all_clusters_are_neutral(m_clusters))
         {
             int buffer_region = (decoding_graph_->d()+1)/2;
@@ -94,7 +103,7 @@ DecodingResult ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
 
     while (!Cluster::all_clusters_are_neutral(m_clusters))
     {
-        last_growth_steps_ += 1;
+        growth_steps += 1;
         vector<DecodingGraphEdge::FusionEdge> fusion_edges;
         for (const auto& cluster : m_clusters)
         {
@@ -112,10 +121,10 @@ DecodingResult ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
     auto peeling_result = PeelingDecoder::decode(m_clusters, decoding_graph_);
     auto new_error_edges = peeling_result.corrections;
     error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
-
+    max_growth_steps = max(max_growth_steps,growth_steps + peeling_result.decoding_steps);
     logger.log_decoding_step({}, decoder_name_, step++, current_round_);
 
-    return {error_edges, considered_up_to_round};
+    return {error_edges, considered_up_to_round, max_growth_steps};
 }
 
 void ClAYGDecoder::merge(const vector<DecodingGraphEdge::FusionEdge>& fusion_edges)
@@ -230,9 +239,10 @@ void ClAYGDecoder::add(const shared_ptr<DecodingGraph>& graph, shared_ptr<Decodi
     }
 }
 
-vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::clean(const shared_ptr<DecodingGraph>& decoding_graph)
+DecodingResult ClAYGDecoder::clean(const shared_ptr<DecodingGraph>& decoding_graph)
 {
     vector<shared_ptr<DecodingGraphEdge>> error_edges;
+    double peeling_steps = 0;
     vector<shared_ptr<Cluster>> new_clusters;
     for (auto& cluster : m_clusters)
     {
@@ -260,7 +270,9 @@ vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::clean(const shared_ptr<Decod
         }
 
         // Peel older, neutral clusters.
-        auto new_error_edges = PeelingDecoder::peel(cluster, decoding_graph);
+        auto cluster_peel_results = PeelingDecoder::peel(cluster, decoding_graph);
+        auto new_error_edges = cluster_peel_results.corrections;
+        peeling_steps = max(peeling_steps, cluster_peel_results.decoding_steps);
         error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
 
         for (const auto& node : cluster->nodes())
@@ -278,7 +290,7 @@ vector<shared_ptr<DecodingGraphEdge>> ClAYGDecoder::clean(const shared_ptr<Decod
         }
     }
     m_clusters = move(new_clusters);
-    return error_edges;
+    return {error_edges, 0,peeling_steps};
 }
 
 SingleLayerClAYGDecoder::SingleLayerClAYGDecoder(const std::unordered_map<std::string, std::string>& args)
@@ -321,15 +333,18 @@ DecodingResult SingleLayerClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
     int step = 0;
     int considered_up_to_round = rounds - 1;
     int last_encountered_non_neutral_cluster = 0;
-    last_growth_steps_ = -(rounds-1);
+    double growth_steps = -(rounds-1);
+    double max_growth_steps = growth_steps;
     for (current_round_ = 0; current_round_ < rounds; current_round_++)
     {
-        last_growth_steps_ = ceil(last_growth_steps_);
+        growth_steps = ceil(growth_steps);
         for (const auto& node : marked_nodes_by_round[current_round_])
         {
             add(decoding_graph_, node);
         }
-        auto new_error_edges = clean(decoding_graph_);
+        auto result = clean(decoding_graph_);
+        auto new_error_edges = result.corrections;
+        max_growth_steps = max(max_growth_steps, growth_steps + result.decoding_steps);
         logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
         error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
         // Growth after adding last round belongs to the bulk growth
@@ -350,13 +365,17 @@ DecodingResult SingleLayerClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
             logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
             merge(fusion_edges);
             logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
-            last_growth_steps_ += 1.0/growth_rounds_;
+            growth_steps += 1.0/growth_rounds_;
             if (stop_early_ && Cluster::all_clusters_are_neutral(m_clusters))
             {
                 break;
             }
         }
-        new_error_edges = clean(decoding_graph_);
+        auto peeling_results = clean(decoding_graph_);
+        new_error_edges = peeling_results.corrections;
+        double fixed_growth_steps = growth_steps_fixed(growth_steps,
+            peeling_results.decoding_steps/growth_rounds_);
+        max_growth_steps = max(max_growth_steps,  fixed_growth_steps);
         error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
         logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
         if (stop_early_ && Cluster::all_clusters_are_neutral(m_clusters))
@@ -375,7 +394,7 @@ DecodingResult SingleLayerClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
 
     while (!Cluster::all_clusters_are_neutral(m_clusters))
     {
-        last_growth_steps_ += 1;
+        growth_steps += 1;
         vector<DecodingGraphEdge::FusionEdge> fusion_edges;
         for (const auto& cluster : m_clusters)
         {
@@ -391,7 +410,8 @@ DecodingResult SingleLayerClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
         logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
     }
 
-    auto [peeling_error_edges, _] = PeelingDecoder::decode(m_clusters, decoding_graph_);
+    auto [peeling_error_edges, _, steps] = PeelingDecoder::decode(m_clusters, decoding_graph_);
+    max_growth_steps = max(max_growth_steps, growth_steps + steps);
     error_edges.insert(error_edges.end(), peeling_error_edges.begin(), peeling_error_edges.end());
     logger.log_decoding_step({}, decoder_name_, step++, current_round_);
     return {error_edges, considered_up_to_round};

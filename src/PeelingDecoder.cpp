@@ -14,19 +14,22 @@ DecodingResult PeelingDecoder::decode(vector<shared_ptr<Cluster>>& clusters,
                                                              decoding_graph)
 {
     vector<shared_ptr<DecodingGraphEdge>> error_edges = {};
+    double peeling_steps = 0;
     for (auto& cluster : clusters)
     {
         if (cluster->marked_nodes().empty())
         {
             continue;
         }
-        auto new_error_edges = peel(cluster, decoding_graph);
+        auto peeling_results = peel(cluster, decoding_graph);
+        auto new_error_edges = peeling_results.corrections;
+        peeling_steps = max(peeling_steps, peeling_results.decoding_steps);
         error_edges.insert(error_edges.end(), new_error_edges.begin(), new_error_edges.end());
     }
-    return { error_edges, decoding_graph->t() };
+    return { error_edges, decoding_graph->t(), peeling_steps };
 }
 
-vector<shared_ptr<DecodingGraphEdge>> PeelingDecoder::peel(shared_ptr<Cluster>& cluster,
+DecodingResult PeelingDecoder::peel(const shared_ptr<Cluster>& cluster,
                                                            const shared_ptr<DecodingGraph>&
                                                            decoding_graph)
 {
@@ -51,6 +54,7 @@ vector<shared_ptr<DecodingGraphEdge>> PeelingDecoder::peel(shared_ptr<Cluster>& 
     }
 
     map<DecodingGraphNode::Id, bool> visited_nodes;
+    map<DecodingGraphNode::Id, int> distances;
     for (const auto& node : cluster->nodes())
     {
         visited_nodes[node->id()] = false;
@@ -59,6 +63,7 @@ vector<shared_ptr<DecodingGraphEdge>> PeelingDecoder::peel(shared_ptr<Cluster>& 
     std::queue<std::shared_ptr<DecodingGraphNode>> node_queue;
     node_queue.push(start_node);
     visited_nodes[start_node->id()] = true;
+    distances[start_node->id()] = 0;
 
     while (spanning_forest_edges.size() < cluster->nodes().size() - 1 && !node_queue.empty())
     {
@@ -81,6 +86,7 @@ vector<shared_ptr<DecodingGraphEdge>> PeelingDecoder::peel(shared_ptr<Cluster>& 
             }
 
             visited_nodes[neighbor->id()] = true;
+            distances[neighbor->id()] = distances[current_node->id()] + 1;
             spanning_forest_edges.emplace_back(current_node, edge);
             node_queue.push(neighbor);
         }
@@ -121,5 +127,11 @@ vector<shared_ptr<DecodingGraphEdge>> PeelingDecoder::peel(shared_ptr<Cluster>& 
         }
     }
 
-    return error_edges;
+    DecodingResult result;
+    result.corrections = error_edges;
+    result.considered_up_to_round = 0;
+    result.decoding_steps = ranges::max_element(distances, [](auto const& a, auto const& b)
+        { return a.second < b.second; })->second;
+
+    return result;
 }

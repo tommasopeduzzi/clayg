@@ -16,7 +16,7 @@ public:
     static DecodingResult decode(std::vector<std::shared_ptr<Cluster>>& clusters,
                                                                   const std::shared_ptr<DecodingGraph>& decoding_graph);
 
-    static std::vector<std::shared_ptr<DecodingGraphEdge>> peel(std::shared_ptr<Cluster>& cluster,
+    static DecodingResult peel(const std::shared_ptr<Cluster>& cluster,
                                                                 const std::shared_ptr<DecodingGraph>& decoding_graph);
 };
 

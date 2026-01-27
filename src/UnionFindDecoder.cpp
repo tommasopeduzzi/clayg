@@ -79,7 +79,7 @@ DecodingResult UnionFindDecoder::decode(const shared_ptr<DecodingGraph> graph)
         }
     }
 
-    last_growth_steps_ = 0;
+    double growth_steps = 0;
     int log_steps = 0;
     // Main Union Find loop
     logger.log_decoding_step(m_clusters, decoder_name_, log_steps++, consider_up_to_round_);
@@ -98,12 +98,14 @@ DecodingResult UnionFindDecoder::decode(const shared_ptr<DecodingGraph> graph)
         logger.log_decoding_step(m_clusters, decoder_name_, log_steps++, consider_up_to_round_);
         merge(fusion_edges);
         logger.log_decoding_step(m_clusters, decoder_name_, log_steps++, consider_up_to_round_);
-        last_growth_steps_++;
+        growth_steps++;
     }
     auto peeling_decoder_results = PeelingDecoder::decode(m_clusters, graph);
+    // Estimate that peeling decoder takes same amount of growth steps as union find
+    growth_steps += peeling_decoder_results.decoding_steps;
     // Log after peeling (no more clusters)
     logger.log_decoding_step({}, decoder_name_, log_steps++, consider_up_to_round_);
-    return {peeling_decoder_results.corrections, consider_up_to_round_};
+    return {peeling_decoder_results.corrections, consider_up_to_round_, growth_steps};
 }
 
 vector<DecodingGraphEdge::FusionEdge> UnionFindDecoder::grow(const shared_ptr<Cluster>& cluster)
