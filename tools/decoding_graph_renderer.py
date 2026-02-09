@@ -136,13 +136,15 @@ class GraphVisualizer3D:
             "error": "red",
             "correction": "green",
             "cluster": [
-                (1.0, 0.6, 0.2, 0.8),
-                (1.0, 0.4, 0.1, 0.8),
-                (1.0, 0.5, 0.3, 0.8),
-                (1.0, 0.3, 0.2, 0.8),
-                (1.0, 0.6, 0.4, 0.8),
-                (1.0, 0.5, 0.1, 0.8),
-                (1.0, 0.4, 0.3, 0.8),
+                # Different shades of blue
+                (0.2, 0.4, 0.8, 1.0),
+                (0.2, 0.6, 0.9, 1.0),
+                (0.3, 0.5, 0.7, 1.0),
+                (0.1, 0.3, 0.6, 1.0),
+                (0.4, 0.6, 0.8, 1.0),
+                (0.3, 0.4, 0.9, 1.0),
+                (0.2, 0.5, 0.7, 1.0),
+                (0.1, 0.4, 0.8, 1.0),
             ]
         }
         self.current_round_color = 'lightgray'
@@ -631,7 +633,6 @@ class GraphVisualizer3D:
         # Remove axes.
         self.ax.set_axis_off()
         # Side view by default.
-        self.ax.view_init(elev=0, azim=0)
         self.fig.canvas.draw_idle()
 
     def toggle_visibility(self, label):
@@ -697,10 +698,25 @@ class GraphVisualizer3D:
         self.show_errors = True
         
         previous_decoding_step = self.decoding_steps[0] if self.decoding_steps else None
+        current_step = self.decoding_steps[0] if self.decoding_steps else None
         for step in self.decoding_steps:
+            self.show_edges = True
+            self.show_edge_labels = False
+            self.show_nodes = True
+            self.show_steps = True
+            self.show_corrections = False
+            self.show_errors = False        
+                
+            if step == self.decoding_steps[0]:
+                self.show_errors = True
+            elif step == self.decoding_steps[-1]:
+                self.show_corrections = True
+                self.show_errors = True
+                
             self.current_decoding_step = step
             
             self.draw_graph()
+            self.ax.view_init(elev=0, azim=0)
             self.fig.canvas.draw()  # update buffer
             output_path = os.path.join(animation_dir, f"step_{step:03d}.png")
             current_decoding_step = self.step_data.get(step)
@@ -755,6 +771,7 @@ class GraphVisualizer3D:
 
         # Precompute centers for arrow path
         centers = []
+        arrows = []
         for row in range(rows):
             y_offset = row * (max_height + spacing_y)
             for col in range(columns):
@@ -768,7 +785,20 @@ class GraphVisualizer3D:
                 cx = x_offset + max_width // 2
                 cy = y_offset + max_height // 2
                 centers.append((cx, cy))
-                
+        
+        arrow_offset = 0.2
+        for idx in range(len(centers)-1):
+            center1_x, center1_y= centers[idx]
+            center2_x, center2_y = centers[idx+1]
+            length_difference = np.sqrt((center1_x - center2_x)**2 + (center1_y - center2_y)**2)
+            direction = (center2_x - center1_x, center2_y- center1_y) * 1/length_difference
+            start = (center1_x, center1_y) + direction*length_difference*arrow_offset
+            end = start + direction*length_difference*(1-2*arrow_offset)
+            arrows.append((start, end))
+            
+        print(arrows)
+
+
         # Draw the faint zig-zag arrow path
         if len(centers) > 1:
             draw.line(centers, fill=arrow_color, width=arrow_width, joint="curve")
@@ -784,6 +814,10 @@ class GraphVisualizer3D:
                 ],
                 fill=arrow_color,
             )
+
+        for arrow in arrows:
+            draw.line(arrow)
+        
 
         # Paste images
         for row in range(rows):
@@ -805,7 +839,7 @@ class GraphVisualizer3D:
         
         # Create gif
         gif_path = os.path.join(animation_dir, "animation.gif")
-        imgs[0].save(gif_path, save_all=True, append_images=imgs[1:], duration=1500, loop=0)
+        imgs[0].save(gif_path, save_all=True, append_images=imgs[1:], duration=1500, loop=0, disposal=2)
         print(f"[INFO] Animated GIF saved to {gif_path}")
 
 
@@ -840,7 +874,6 @@ def main():
     # --- Export mode: save images for each cluster step instead of interactive display ---
     if args.animation and args.decoder and args.steps and visualizer.decoding_steps:
         animation_dir = args.animation_dir if args.animation_dir else f"{args.directory}/{args.run_id}/{args.decoder}/animation"
-        print(animation_dir)
         os.makedirs(animation_dir, exist_ok=True)
         visualizer.save_clustering_animation(animation_dir, make_comic=True)
         sys.exit(0)
