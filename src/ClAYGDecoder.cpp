@@ -40,6 +40,7 @@ DecodingResult ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
     int last_encountered_non_neutral_cluster = 0;
     double growth_steps = -(rounds-1); // don't count last round as being negative
     double max_growth_steps = growth_steps;
+    logger.log_decoding_step(m_clusters, decoder_name_, step++, rounds);
     for (current_round_ = 0; current_round_ < rounds; current_round_++)
     {
         growth_steps = ceil(growth_steps);
@@ -77,7 +78,9 @@ DecodingResult ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
                 break;
             }
         }
+        logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
         peeling_results = clean(decoding_graph_);
+        logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
         error_edges.insert(error_edges.end(), peeling_results.corrections.begin(),
             peeling_results.corrections.end());
         fixed_growth_steps = growth_steps_fixed(growth_steps,
@@ -116,6 +119,7 @@ DecodingResult ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
         }
         logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
         merge(fusion_edges);
+        logger.log_decoding_step(m_clusters, decoder_name_, step++, current_round_);
     }
 
     auto peeling_result = PeelingDecoder::decode(m_clusters, decoding_graph_);
@@ -263,7 +267,7 @@ DecodingResult ClAYGDecoder::clean(const shared_ptr<DecodingGraph>& decoding_gra
             cluster_lifetime = static_cast<int>(cluster_lifetime_factor_);
         }
 
-        if (current_round_ - cluster->has_been_neutral_since() <= cluster_lifetime)
+        if (current_round_ - cluster->has_been_neutral_since() < cluster_lifetime)
         {
             new_clusters.push_back(move(cluster));
             continue;
