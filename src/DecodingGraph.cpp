@@ -82,7 +82,7 @@ shared_ptr<DecodingGraph> DecodingGraph::surface_code(int D, int T) {
 
 shared_ptr<DecodingGraph> DecodingGraph::rotated_surface_code(int D, int T) {
     int ancilla_height = D - 1;
-    int ancilla_width = static_cast<int>(D / 2) + 1;
+    int ancilla_width = (D+1)/2;
 
     auto graph = make_shared<DecodingGraph>();
 
@@ -148,8 +148,6 @@ shared_ptr<DecodingGraph> DecodingGraph::rotated_surface_code(int D, int T) {
                         auto edge = make_shared<DecodingGraphEdge>(current_edge_id, nodes);
                         graph->addEdge(edge);
                         current_edge_id++;
-                        if (y == 3)
-                            graph->addLogicalEdge(edge);
                     }
                     auto other_node_id = DecodingGraphNode::Id{DecodingGraphNode::ANCILLA, t,
                                                                x + (y - 1) * ancilla_width};
@@ -157,8 +155,6 @@ shared_ptr<DecodingGraph> DecodingGraph::rotated_surface_code(int D, int T) {
                     auto edge = make_shared<DecodingGraphEdge>(current_edge_id, nodes);
                     graph->addEdge(edge);
                     current_edge_id++;
-                    if (y == 3)
-                        graph->addLogicalEdge(edge);
                 }
 
             }
@@ -174,8 +170,13 @@ shared_ptr<DecodingGraph> DecodingGraph::rotated_surface_code(int D, int T) {
             graph->addEdge(make_shared<DecodingGraphEdge>(current_edge_id,
                                                           make_pair(node, bottom_boundary_node)));
             current_edge_id++;
-
         }
+    }
+
+    for (int id = 0; id < D; id++)
+    {
+        auto edge = graph->edge(DecodingGraphEdge::Id{DecodingGraphEdge::NORMAL, 0, id}).value();
+        graph->addLogicalEdge(edge);
     }
 
     return graph;
