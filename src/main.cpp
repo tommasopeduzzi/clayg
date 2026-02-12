@@ -203,26 +203,56 @@ vector<DecodingGraphEdge::Id> generate_errors(int D, int T, double p, uniform_re
     return error_edge_ids;
 }
 
-int compute_logical(int logical, const set<int>& logical_edge_ids,
-                    const DecodingResult& corrections)
+int compute_logical(const shared_ptr<DecodingGraph> decoding_graph,
+                    const vector<shared_ptr<DecodingGraphEdge>>& bulk_errors,
+                    const vector<shared_ptr<DecodingGraphEdge>>& idling_errors,
+                    const DecodingResult& decoding_result)
 {
-    const auto considered_rounds = corrections.considered_up_to_round;
-    const auto error_edges = corrections.corrections;
-    for (const auto& error : error_edges)
+    int consider_errors_up_to_round = decoding_result.considered_up_to_round;
+    auto correction_edges = decoding_result.corrections;
+
+    map<int, bool> final_measurement;
+
+    for (auto& edge : decoding_graph->edges())
     {
-        // Check if edge is relevant to final measurement
-        if (error->id().type == DecodingGraphEdge::Type::MEASUREMENT)
-            continue;
-
-        if (error->id().round > considered_rounds)
-            continue;
-
-        if (logical_edge_ids.find(error->id().id) == logical_edge_ids.end())
-            continue;
-
-        logical += 1;
+        final_measurement[edge->id().id] = false;
     }
-    return logical % 2;
+    for (auto edges_to_flip : {bulk_errors, correction_edges, idling_errors})
+    {
+        for (auto& edge : edges_to_flip)
+        {
+            if (edge->id().round > consider_errors_up_to_round)
+                continue;
+            final_measurement[edge->id().id] = !final_measurement[edge->id().id];
+        }
+    }
+
+    auto final_correction_decoding_graph = DecodingGraph::single_layer_copy(decoding_graph);
+    for (const auto& node : final_correction_decoding_graph->nodes())
+    {
+        // FIXME: Maybe even mark virtual nodes?
+        if (node->id().type == DecodingGraphNode::Type::VIRTUAL)
+            continue;
+        bool defect = false;
+        for (const auto& edge_weak_ptr : node->edges())
+        {
+            const auto edge = edge_weak_ptr.lock();
+            defect = defect xor final_measurement[edge->id().id];
+        }
+        node->set_marked(defect);
+    }
+    auto final_classical_correction = UnionFindDecoder().decode(final_correction_decoding_graph);
+    for (auto& edge : final_classical_correction.corrections)
+    {
+        final_measurement[edge->id().id] = !final_measurement[edge->id().id];
+    }
+
+    bool logical = false;
+    for (auto logical_edge : decoding_graph->logical_edge_ids())
+    {
+        logical = logical xor final_measurement[logical_edge];
+    }
+    return logical;
 }
 
 void increment_by_step(double& variable, pair<char, double> step)
@@ -308,7 +338,6 @@ int main(int argc, char* argv[])
     logger.set_distance(stoi(args["D"]));
 
     auto graph = DecodingGraph::rotated_surface_code(D, T);
-    auto logical_edge_ids = graph->logical_edge_ids();
     vector<shared_ptr<DecodingGraphEdge>> error_edges{};
     vector<DecodingGraphEdge::Id> error_edge_ids{};
 
@@ -380,20 +409,16 @@ int main(int argc, char* argv[])
                     correction_ids.push_back(edge->id());
                 }
                 logger.log_corrections(correction_ids, decoder->decoder_name());
-                int logical = compute_logical(0, logical_edge_ids, {
-                    error_edges,
-                    decoding_results.considered_up_to_round
-                });
-                int logical_after_decoding = compute_logical(logical, logical_edge_ids, decoding_results);
-                if (logical_after_decoding != 0) {
+
+                int logical_without_idling = compute_logical(graph, error_edges, {}, decoding_results);
+                if (logical_without_idling != 0) {
                     uncorrected = true;
                 }
+                errors[decoder->decoder_name()][0.0].rolling_sum += logical_without_idling;
+                errors[decoder->decoder_name()][0.0].count += 1;
 
                 double num_growth_steps = decoding_results.decoding_steps;
                 growth_steps[decoder->decoder_name()][num_growth_steps] += 1;
-
-                errors[decoder->decoder_name()][0.0].rolling_sum += logical_after_decoding;
-                errors[decoder->decoder_name()][0.0].count += 1;
 
                 double idling_time_constant = idling_time_constant_start;
                 while (!increment_end_condition(idling_time_constant, idling_time_constant_start, idling_time_constant_end))
@@ -415,10 +440,8 @@ int main(int argc, char* argv[])
                             auto edge = graph->edge(id).value();
                             idling_error_edges.push_back(edge);
                         }
-                        int logical_after_idling = compute_logical(logical_after_decoding, logical_edge_ids, {
-                            idling_error_edges,
-                            decoding_results.considered_up_to_round
-                        });
+                        int logical_after_idling = compute_logical(graph, error_edges, idling_error_edges,
+                            decoding_results);
                         errors[decoder->decoder_name()][idling_time_constant].rolling_sum += logical_after_idling;
                         errors[decoder->decoder_name()][idling_time_constant].count += 1;
                     }

@@ -310,21 +310,7 @@ DecodingResult SingleLayerClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
     const int rounds = graph->t();
     if (!decoding_graph_ || decoding_graph_->d() != graph->d())
     {
-        if (graph->code_name() == "rotated_surface_code")
-        {
-            decoding_graph_ = DecodingGraph::rotated_surface_code(graph->d(), 1);
-        } else if (graph->code_name() == "surface_code")
-        {
-            decoding_graph_ = DecodingGraph::surface_code(graph->d(), 1);
-        }
-        else if (graph->code_name() == "repetition_code")
-        {
-            decoding_graph_ = DecodingGraph::repetition_code(graph->d(), 1);
-        }
-        else
-        {
-            throw runtime_error("SingleLayerClAYGDecoder: Unsupported code type " + decoding_graph_->code_name());
-        }
+        decoding_graph_ = DecodingGraph::single_layer_copy(graph);
     }
     else
     {

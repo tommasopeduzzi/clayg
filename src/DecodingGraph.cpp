@@ -236,6 +236,21 @@ std::shared_ptr<DecodingGraph> DecodingGraph::repetition_code(int D, int T)
     return graph;
 }
 
+std::shared_ptr<DecodingGraph> DecodingGraph::single_layer_copy(std::shared_ptr<DecodingGraph> graph)
+{
+    if (graph->code_name() == "rotated_surface_code")
+    {
+        return DecodingGraph::rotated_surface_code(graph->d(), 1);
+    } if (graph->code_name() == "surface_code")
+    {
+        return DecodingGraph::surface_code(graph->d(), 1);
+    } if (graph->code_name() == "repetition_code")
+    {
+        return DecodingGraph::repetition_code(graph->d(), 1);
+    }
+    throw runtime_error("SingleLayerClAYGDecoder: Unsupported code type " + graph->code_name());
+}
+
 optional<shared_ptr<DecodingGraphNode>> DecodingGraph::node(const DecodingGraphNode::Id id) {
     if (id.type == DecodingGraphNode::Type::VIRTUAL) {
         return m_virtual_nodes[id.id];
