@@ -12,6 +12,7 @@
 #include "UnionFindDecoder.h"
 #include "ClAYGDecoder.h"
 #include "Logger.h"
+#include "LogicalComputer.h"
 
 using namespace std;
 
@@ -338,6 +339,8 @@ int main(int argc, char* argv[])
     logger.set_distance(stoi(args["D"]));
 
     auto graph = DecodingGraph::rotated_surface_code(D, T);
+    auto logical_computer = LogicalComputer(graph);
+
     vector<shared_ptr<DecodingGraphEdge>> error_edges{};
     vector<DecodingGraphEdge::Id> error_edge_ids{};
 
@@ -410,7 +413,8 @@ int main(int argc, char* argv[])
                 }
                 logger.log_corrections(correction_ids, decoder->decoder_name());
 
-                int logical_without_idling = compute_logical(graph, error_edges, {}, decoding_results);
+                logical_computer.clear_cache();
+                int logical_without_idling = logical_computer.compute(error_edges, {}, decoding_results);
                 if (logical_without_idling != 0) {
                     uncorrected = true;
                 }
@@ -440,7 +444,7 @@ int main(int argc, char* argv[])
                             auto edge = graph->edge(id).value();
                             idling_error_edges.push_back(edge);
                         }
-                        int logical_after_idling = compute_logical(graph, error_edges, idling_error_edges,
+                        int logical_after_idling = logical_computer.compute(error_edges, idling_error_edges,
                             decoding_results);
                         errors[decoder->decoder_name()][idling_time_constant].rolling_sum += logical_after_idling;
                         errors[decoder->decoder_name()][idling_time_constant].count += 1;

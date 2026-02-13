@@ -21,6 +21,7 @@ add_library(clayg_lib
         src/ClAYGDecoder.cpp
         src/Decoder.cpp
         src/Logger.cpp
+        src/LogicalComputer.cpp
 )
 
 target_include_directories(clayg_lib
