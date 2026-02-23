@@ -9,19 +9,21 @@
 
 CWD="$(pwd)"
 CLAYG_EXEC="$CWD/../build/clayg"
-PARAM_FILE="$CWD/params.txt"
+PARAM_FILE="$CWD/generated_params.txt"
 
 LINE=$(sed -n "$((SLURM_ARRAY_TASK_ID + 1))p" "$PARAM_FILE")
-read -r DECODERS DIST RUNS_P RUNS_IDLING BASE_DIR P_START P_END P_STEP IDL_START IDL_END IDL_STEP <<< "$LINE"
+read -r DECODERS DIST RUNS_P RUNS_IDLING BASE_DIR P_START P_END P_STEP IDL_START IDL_END IDL_STEP NOISE_MODEL <<< "$LINE"
 echo "$LINE"
 
 timestamp=$(date +%F_%H-%M-%S)
-OUTPUT_DIR="$CWD/../$BASE_DIR/${timestamp}_D${DIST}"
+noise_dir=$(echo "${NOISE_MODEL}" | sed 's/[^A-Za-z0-9._-]/_/g')
+OUTPUT_DIR="$CWD/../$BASE_DIR/${timestamp}_D${DIST}/${noise_dir}"
 mkdir -p "$OUTPUT_DIR"
 
-echo "[$SLURM_ARRAY_TASK_ID] D=$DIST, (prob $P_START→$P_END $P_STEP) (idling $IDL_START→$IDL_END $IDL_STEP) -> $OUTPUT_DIR"
+echo "[$SLURM_ARRAY_TASK_ID] D=$DIST, (prob $P_START→$P_END $P_STEP) (idling $IDL_START→$IDL_END $IDL_STEP) noise_model=$NOISE_MODEL -> $OUTPUT_DIR"
 
 "$CLAYG_EXEC" "$DIST" "$DIST" "$DECODERS" "$OUTPUT_DIR" \
     --p_start "${P_START}" --p_end "${P_END}" --p_step "${P_STEP}" \
     --idling_time_constant_start "$IDL_START" --idling_time_constant_end "$IDL_END" --idling_time_constant_step "$IDL_STEP" \
-    --dump false --runs_p "$RUNS_P" --runs_idling "$RUNS_IDLING"
+    --dump false --runs_p "$RUNS_P" --runs_idling "$RUNS_IDLING" \
+    --noise_model "$NOISE_MODEL"

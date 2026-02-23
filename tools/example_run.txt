@@ -16,6 +16,10 @@
   },
   "Category": "threshold",
   "Results Directory": "data/PAPER",
+  "Noise Models": [
+    "phenomenological",
+    "NORMAL=1,MEASUREMENT=0.1"
+  ],
   "P Start": 0.03169,
   "P End": 0.03169,
   "P Step": "*1.28",

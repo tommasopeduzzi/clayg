@@ -7,7 +7,7 @@ import os
 # --- CLI arguments ---
 parser = argparse.ArgumentParser(description="Generate params.txt and update SLURM array job script.")
 parser.add_argument("config_file", help="Path to configuration file (e.g. run_config.txt)")
-parser.add_argument("--param_file", default="params.txt", help="Path to output parameter file")
+parser.add_argument("--param_file", default="generated_params.txt", help="Path to output parameter file")
 parser.add_argument("--batch_file", default="submit_clayg_array_job.sh", help="Path to SLURM batch file")
 args = parser.parse_args()
 
@@ -76,6 +76,20 @@ runs_idling = config.get("Runs_P", "auto")
 dump = config.get("Dump", "false")
 base_dir = config.get("Results Directory", "data/no_category")
 
+# --- Noise models (per-run) ---
+# Accept either a comma-separated string or a list in the JSON config under key "Noise Models" or "Noise Model".
+raw_noise = config.get("Noise Models", config.get("Noise Model", None))
+if raw_noise is None:
+    noise_models = ["phenomenological"]
+else:
+    if isinstance(raw_noise, list):
+        noise_models = [str(x) for x in raw_noise]
+    else:
+        # parse comma-separated string
+        noise_models = [x.strip() for x in str(raw_noise).split(",") if x.strip()]
+    if not noise_models:
+        noise_models = ["phenomenological"]
+
 # parameter ranges
 P_MIN, P_MAX = 0.005, 0.02
 IDLE_MIN, IDLE_MAX = 200, 1_000_000
@@ -130,10 +144,11 @@ lines = []
 if mode == "probabilties_list":
     for d in distances:
         for p in probabilities:
-            lines.append(
-                f"{decoders} {d} {runs_p(p, idling_start)} {runs_idling(p, idling_start)} {base_dir}/{category} {p} {p} *1.2 "
-                f"{idling_start} {idling_end} {idling_step}\n"
-            )
+            for noise_model in noise_models:
+                lines.append(
+                    f"{decoders} {d} {runs_p(p, idling_start)} {runs_idling(p, idling_start)} {base_dir}/{category} {p} {p} *1.2 "
+                    f"{idling_start} {idling_end} {idling_step} {noise_model}\n"
+                )
 elif mode== "split_p_steps":
         all_ps = []
         p = p_start
@@ -164,16 +179,18 @@ elif mode== "split_p_steps":
 
         for d in distances:
             for chunk_start, chunk_end in chunks:
-                lines.append(
-                    f"{decoders} {d} {runs_p(chunk_start, idling_start)} {runs_idling(chunk_start, idling_start)} {base_dir}/{category} {chunk_start} {chunk_end} {p_step} "
-                    f"{idling_start} {idling_end} {idling_step}\n"
-                )
+                for noise_model in noise_models:
+                    lines.append(
+                        f"{decoders} {d} {runs_p(chunk_start, idling_start)} {runs_idling(chunk_start, idling_start)} {base_dir}/{category} {chunk_start} {chunk_end} {p_step} "
+                        f"{idling_start} {idling_end} {idling_step} {noise_model}\n"
+                    )
 elif mode == "p_step":
     for d in distances:
-        lines.append(
-            f"{decoders} {d} {runs_p(p, idling_start)} {runs_idling(p, idling_start)} {base_dir}/{category} {p_start} {p_end} {p_step} "
-            f"{idling_start} {idling_end} {idling_step}\n"
-        )
+        for noise_model in noise_models:
+            lines.append(
+                f"{decoders} {d} {runs_p(p, idling_start)} {runs_idling(p, idling_start)} {base_dir}/{category} {p_start} {p_end} {p_step} "
+                f"{idling_start} {idling_end} {idling_step} {noise_model}\n"
+            )
 else:
     raise ValueError(f"Unknown mode: {mode}")
 

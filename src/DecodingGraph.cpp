@@ -363,3 +363,44 @@ std::vector<std::vector<std::shared_ptr<DecodingGraphNode>>> DecodingGraph::mark
     }
     return marked_nodes;
 }
+
+std::vector<DecodingGraphEdge::Id> DecodingGraph::sample_errors(
+    double p,
+    const std::map<DecodingGraphEdge::Type, double>& noise_model,
+    int sample_T,
+    std::uniform_real_distribution<double>& dis,
+    std::mt19937& gen) const
+{
+    std::vector<DecodingGraphEdge::Id> error_ids;
+    int use_T = (sample_T < 0) ? T : sample_T;
+
+    for (int t = 0; t < use_T; t++)
+    {
+        // sample normal edges at round t
+        if (t < static_cast<int>(m_normal_edges.size())) {
+            for (const auto& [id, edge] : m_normal_edges[t]) {
+                double factor = 1.0;
+                auto it = noise_model.find(DecodingGraphEdge::NORMAL);
+                if (it != noise_model.end()) factor = it->second;
+                double p_effective = p * factor;
+                if (p_effective > 0 && dis(gen) <= p_effective) {
+                    error_ids.push_back(edge->id());
+                }
+            }
+        }
+
+        // sample measurement edges originating at round t (measurement edges are associated with round t)
+        if (t < static_cast<int>(m_measurement_edges.size())) {
+            for (const auto& [id, edge] : m_measurement_edges[t]) {
+                double factor = 1.0;
+                auto it = noise_model.find(DecodingGraphEdge::MEASUREMENT);
+                if (it != noise_model.end()) factor = it->second;
+                double p_effective = p * factor;
+                if (p_effective > 0 && dis(gen) <= p_effective) {
+                    error_ids.push_back(edge->id());
+                }
+            }
+        }
+    }
+    return error_ids;
+}

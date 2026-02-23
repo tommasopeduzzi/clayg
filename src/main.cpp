@@ -97,6 +97,7 @@ unordered_map<string, string> parse_args(int argc, char* argv[]) {
         }},
         {"runs_p", "10000", [](const string& v){ stoi(v); }},
         {"runs_idling", "10000", [](const string& v){ stoi(v); }},
+        {"noise_model", "phenomenological", [](const string& v){ /* free-form; parsed later */ }},
     };
 
     unordered_set<string> known_keys;
@@ -147,64 +148,96 @@ unordered_map<string, string> parse_args(int argc, char* argv[]) {
             exit(1);
         }
     }
-
     return args;
+}
+
+// Parse a noise model string (e.g. "NORMAL=1,MEASUREMENT=0.1" or "phenomenological")
+// into a map from DecodingGraphEdge::Type -> factor.
+static std::map<DecodingGraphEdge::Type, double> parse_noise_model(const string& noise_model_arg)
+{
+    std::map<DecodingGraphEdge::Type, double> type_factors;
+    if (noise_model_arg.empty() || noise_model_arg == "phenomenological") {
+        type_factors[DecodingGraphEdge::NORMAL] = 1.0;
+        type_factors[DecodingGraphEdge::MEASUREMENT] = 1.0;
+        return type_factors;
+    }
+
+    stringstream ss(noise_model_arg);
+    string kv;
+    auto trim = [](string& str) {
+        size_t a = str.find_first_not_of(" \t\n\r");
+        size_t b = str.find_last_not_of(" \t\n\r");
+        if (a == string::npos) { str = ""; return; }
+        str = str.substr(a, b - a + 1);
+    };
+
+    // defaults
+    double normal_val = NAN;
+    double measurement_val = NAN;
+
+    while (getline(ss, kv, ',')) {
+        if (kv.empty()) continue;
+        auto eq = kv.find('=');
+        if (eq == string::npos) {
+            cerr << "Invalid noise_model token (expected KEY=VALUE): " << kv << endl;
+            exit(1);
+        }
+        string key = kv.substr(0, eq);
+        string val = kv.substr(eq + 1);
+        trim(key); trim(val);
+        for (auto & c: key) c = static_cast<char>(toupper(static_cast<unsigned char>(c)));
+        try {
+            if (key == "NORMAL") {
+                normal_val = stod(val);
+            } else if (key == "MEASUREMENT") {
+                measurement_val = stod(val);
+            } else {
+                cerr << "Unknown edge type in noise_model: " << key << endl;
+                exit(1);
+            }
+        } catch (const std::exception& e) {
+            cerr << "Invalid numeric value in noise_model for " << key << ": " << val << endl;
+            exit(1);
+        }
+    }
+
+    if (std::isnan(normal_val)) normal_val = 1.0;
+    if (std::isnan(measurement_val)) measurement_val = 1.0;
+    type_factors[DecodingGraphEdge::NORMAL] = normal_val;
+    type_factors[DecodingGraphEdge::MEASUREMENT] = measurement_val;
+    return type_factors;
 }
 
 vector<DecodingGraphEdge::Id> parse_errors(string errors)
 {
     vector<DecodingGraphEdge::Id> error_edge_ids;
-    regex re("(\\d+)-(\\d+)-(\\d+)");
+    regex re(R"((\d+)-(\d+)-(\d+))");
     smatch match;
     istringstream stream(errors);
     while (getline(stream, errors))
     {
         if (regex_search(errors, match, re))
         {
-            DecodingGraphEdge::Id id;
+            DecodingGraphEdge::Id id{};
             id.type = static_cast<DecodingGraphEdge::Type>(stoi(match[1].str()));
             id.round = stoi(match[2].str());
             id.id = stoi(match[3].str());
             error_edge_ids.push_back(id);
         }
         // check if line is not only whitespace
-        else if (!regex_match(errors, regex("^\\s*$")))
-        {
-            cerr << "Error: Invalid error format: " << errors << endl;
-            exit(1);
+        else {
+            regex re_ws(R"(^\s*$)");
+            if (!regex_match(errors, re_ws))
+             {
+                 cerr << "Error: Invalid error format: " << errors << endl;
+                 exit(1);
+             }
         }
     }
     return error_edge_ids;
 }
 
-vector<DecodingGraphEdge::Id> generate_errors(int D, int T, double p, uniform_real_distribution<double>& dis,
-                                              mt19937& gen)
-{
-    vector<DecodingGraphEdge::Id> error_edge_ids;
-    for (int t = 0; t < T; t++)
-    {
-        for (int edge = 0; edge < D * D; edge++)
-        {
-            if (dis(gen) <= p)
-            {
-                auto id = DecodingGraphEdge::Id{DecodingGraphEdge::Type::NORMAL, t, edge};
-                error_edge_ids.push_back(id);
-            }
-        }
-        if (t == T - 1) continue;
-        for (int edge = 0; edge < (D - 1) * (int(D / 2) + 1); edge++)
-        {
-            if (dis(gen) <= p)
-            {
-                auto id = DecodingGraphEdge::Id{DecodingGraphEdge::Type::MEASUREMENT, t, edge};
-                error_edge_ids.push_back(id);
-            }
-        }
-    }
-    return error_edge_ids;
-}
-
-int compute_logical(const shared_ptr<DecodingGraph> decoding_graph,
+int compute_logical(const shared_ptr<DecodingGraph>& decoding_graph,
                     const vector<shared_ptr<DecodingGraphEdge>>& bulk_errors,
                     const vector<shared_ptr<DecodingGraphEdge>>& idling_errors,
                     const DecodingResult& decoding_result)
@@ -218,9 +251,10 @@ int compute_logical(const shared_ptr<DecodingGraph> decoding_graph,
     {
         final_measurement[edge->id().id] = false;
     }
-    for (auto edges_to_flip : {bulk_errors, correction_edges, idling_errors})
+    const vector<const vector<shared_ptr<DecodingGraphEdge>>*> flip_sets = {&bulk_errors, &correction_edges, &idling_errors};
+    for (const auto* edges_to_flip : flip_sets)
     {
-        for (auto& edge : edges_to_flip)
+        for (const auto& edge : *edges_to_flip)
         {
             if (edge->id().round > consider_errors_up_to_round)
                 continue;
@@ -301,6 +335,9 @@ int main(int argc, char* argv[])
 
     int D = stoi(args["D"]);
     int T = stoi(args["T"]);
+    // parse noise model string into per-type factors
+    auto noise_model = parse_noise_model(args["noise_model"]);
+
     double p_start = stod(args["p_start"]);
     double p_end = stod(args["p_end"]);
     pair p_step = {args["p_step"][0], stod(args["p_step"].substr(1))};
@@ -393,7 +430,7 @@ int main(int argc, char* argv[])
         for (int i = 0; i < runs_p; i++)
         {
             logger.prepare_dump_dir();
-            error_edge_ids = generate_errors(D, T, p, dis, gen);
+            error_edge_ids = graph->sample_errors(p, noise_model, T, dis, gen);
             logger.log_errors(error_edge_ids);
             logger.log_graph(graph);
             error_edges.clear();
@@ -437,7 +474,7 @@ int main(int argc, char* argv[])
                     idling[decoder->decoder_name()][idling_time_constant].count += 1;
                     for (int run_idling = 0; run_idling < runs_idling; run_idling++)
                     {
-                        auto idling_error_edge_ids = generate_errors(D, 1, p_idling, dis, gen);
+                        auto idling_error_edge_ids = graph->sample_errors(p_idling, noise_model, 1, dis, gen);
                         auto idling_error_edges = vector<shared_ptr<DecodingGraphEdge>>{};
                         for (auto id : idling_error_edge_ids)
                         {

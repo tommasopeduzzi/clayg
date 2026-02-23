@@ -13,6 +13,7 @@
 #include <set>
 #include <cassert>
 #include <string>
+#include <random>
 
 #include "Cluster.h"
 
@@ -174,6 +175,14 @@ public:
     std::vector<std::shared_ptr<DecodingGraphNode>> nodes() { return m_nodes; }
 
     std::vector<std::shared_ptr<DecodingGraphEdge>> edges() { return m_edges; }
+
+    // Sample errors using a per-edge-type multiplier map. If sample_T < 0 the graph's T is used.
+    std::vector<DecodingGraphEdge::Id> sample_errors(
+        double p,
+        const std::map<DecodingGraphEdge::Type, double>& noise_model,
+        int sample_T,
+        std::uniform_real_distribution<double>& dis,
+        std::mt19937& gen) const;
 
     void addNode(const std::shared_ptr<DecodingGraphNode>& node);
 
