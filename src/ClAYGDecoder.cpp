@@ -20,6 +20,11 @@ ClAYGDecoder::ClAYGDecoder(const std::unordered_map<std::string, std::string>& a
         this->set_cluster_lifetime_factor(stod(it->second));
         this->decoder_name_ += "_lifetime_" + it->second;
     }
+
+    if (auto it = args.find("growth_rounds"); it != args.end()) {
+        this->set_growth_rounds(stoi(it->second));
+        this->decoder_name_ += "_growth_rounds_" + it->second;
+    }
 }
 
 DecodingResult ClAYGDecoder::decode(shared_ptr<DecodingGraph> graph)
