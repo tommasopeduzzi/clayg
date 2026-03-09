@@ -158,14 +158,25 @@ void Logger::set_distance(int distance) {
     distance_ = distance;
 }
 
+void Logger::set_rounds(int rounds) {
+    rounds_ = rounds;
+}
+
 int Logger::get_distance() const {
     return distance_;
+}
+
+int Logger::get_rounds() const {
+    return rounds_;
 }
 
 void Logger::log_results_entry(double logical_error_rate, int runs, double p,  double idling_time_constant, const std::string& decoder_name) {
     std::string filename = results_dir_ + "/results/"+ decoder_name + "_";
     if (distance_ > 0) {
         filename += "d=" + std::to_string(distance_) + "_";
+    }
+    if (rounds_ > 0) {
+        filename += "t=" + std::to_string(rounds_) + "_";
     }
     if (idling_time_constant > 0.0)
     {
@@ -185,6 +196,9 @@ void Logger::log_idling_entry(double logical_error_rate, int runs, double p,  do
     if (distance_ > 0) {
         filename += "d=" + std::to_string(distance_) + "_";
     }
+    if (rounds_ > 0) {
+        filename += "t=" + std::to_string(rounds_) + "_";
+    }
     if (idling_time_constant > 0.0)
     {
         filename += "idlingtimeconstant=" + std::to_string(idling_time_constant) + "_";
@@ -199,13 +213,15 @@ void Logger::log_idling_entry(double logical_error_rate, int runs, double p,  do
 }
 
 void Logger::log_growth_steps(double p, const std::map<double, int>& frequencies, const std::string& decoder_name) {
-    std::string filename;
+    std::string filename = results_dir_ + "/steps/"+ decoder_name + "_";
     if (distance_ > 0) {
-        filename = results_dir_ + "/steps/" + decoder_name + "_d=" +
-            std::to_string(distance_) + "_p=" + std::to_string(p) +  ".txt";
-    } else {
-        filename = results_dir_ + "/steps/" + decoder_name + ".txt";
+        filename += "d=" + std::to_string(distance_) + "_";
     }
+    if (rounds_ > 0) {
+        filename += "t=" + std::to_string(rounds_) + "_";
+    }
+    filename += "p=" + std::to_string(p);
+    filename += ".txt";
     for (const auto& [steps, count] : frequencies) {
         std::ostringstream line;
         line << steps << "\t" << count << "\n";

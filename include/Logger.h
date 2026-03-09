@@ -43,9 +43,11 @@ public:
     void set_run_id(std::string id);
     std::string get_run_id() const;
 
-    // Distance management
+    // Distance & rounds management
     void set_distance(int distance);
     int get_distance() const;
+    void set_rounds(int rounds);
+    int get_rounds() const;
 
     // Progress logging
     static void log_progress(int current, int total, double p, int D, int interval_ms = 200);
@@ -63,6 +65,7 @@ private:
     std::string dump_dir_ = "data/runs";
     std::string results_dir_ = "data/results";
     int distance_ = -1;
+    int rounds_ = -1;
 };
 
 extern Logger logger;

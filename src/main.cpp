@@ -370,10 +370,9 @@ int main(int argc, char* argv[])
         }
     }
 
-    // Set results directory for logger
     logger.set_results_dir(args["results"]);
-    // Set distance for logger (for results_d={distance}.txt and average_operations_d={distance}.txt)
-    logger.set_distance(stoi(args["D"]));
+    logger.set_distance(D);
+    logger.set_rounds(T);
 
     auto graph = DecodingGraph::rotated_surface_code(D, T);
     auto logical_computer = LogicalComputer(graph);
