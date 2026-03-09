@@ -1,6 +1,7 @@
 {
-  "Mode": "p_step",
+  "Mode": "split_p_steps",
   "D": [6, 8, 10, 12, 14, 16, 18],
+  "Rounds": [1.0, 2.0],
   "Decoders": {
     "uf": {
     	"stop_early": ["true", "false"]
@@ -27,5 +28,6 @@
   "Idling Time Constant End": 0,
   "Idling Time Constant Step": "*1.5",
   "Runs_P": 100000,
+  "Runs_Idling": 400,
   "Dump": false
 }

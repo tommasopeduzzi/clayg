@@ -53,7 +53,8 @@ def generate_decoder_string(dec_dict):
     return ",".join(all_configs)
 
 # --- Extract configuration ---
-distances = config.get("D", [6,8,10,12,14,16])
+distances = config.get("D", [5,7,9,11,13])
+rounds_list = config.get("Rounds", [1.0]) # If rounds is specified as a float, treat it as a multiplier of D, otherwise use it directly. 
 decoders = generate_decoder_string(config.get("Decoders", {"clayg": {}, "sl_clayg": {}, "uf": {}}))
 category = config.get("Category", "new")
 
@@ -72,7 +73,7 @@ idling_end = config.get("Idling Time Constant End", "0.01")
 idling_step = config.get("Idling Time Constant Step", "+0.005")
 
 runs_p = config.get("Runs_P", "auto")
-runs_idling = config.get("Runs_P", "auto")
+runs_idling = config.get("Runs_Idling", "auto")
 dump = config.get("Dump", "false")
 base_dir = config.get("Results Directory", "data/no_category")
 
@@ -131,24 +132,29 @@ def auto_runs_idling(p, idling):
 if runs_p == "auto":
     runs_p = auto_runs_p
 else:
-    runs_p = lambda p, idling=None: int(runs_p)
+    runs_p_const = int(runs_p)
+    runs_p = lambda p, idling=None: runs_p_const
 
 if runs_idling == "auto":
     runs_idling = auto_runs_idling
 else:
-    runs_idling = lambda p, idling: int(runs_idling)
+    runs_idling_const = int(runs_idling)
+    runs_idling = lambda p, idling: runs_idling_const
 
 
 # --- Generate params lines ---
 lines = []
 if mode == "probabilties_list":
     for d in distances:
-        for p in probabilities:
-            for noise_model in noise_models:
-                lines.append(
-                    f"{decoders} {d} {runs_p(p, idling_start)} {runs_idling(p, idling_start)} {base_dir}/{category} {p} {p} *1.2 "
-                    f"{idling_start} {idling_end} {idling_step} {noise_model}\n"
-                )
+        for rounds in rounds_list:
+            if not type(rounds) == int:
+                rounds *= d
+            for p in probabilities:
+                for noise_model in noise_models:
+                    lines.append(
+                        f"{decoders} {d} {rounds} {runs_p(p, idling_start)} {runs_idling(p, idling_start)} {base_dir}/{category} {p} {p} *1.2 "
+                        f"{idling_start} {idling_end} {idling_step} {noise_model}\n"
+                    )
 elif mode== "split_p_steps":
         all_ps = []
         p = p_start
@@ -178,17 +184,23 @@ elif mode== "split_p_steps":
         chunks = list(chunk_list(all_ps, 2))
 
         for d in distances:
-            for chunk_start, chunk_end in chunks:
-                for noise_model in noise_models:
-                    lines.append(
-                        f"{decoders} {d} {runs_p(chunk_start, idling_start)} {runs_idling(chunk_start, idling_start)} {base_dir}/{category} {chunk_start} {chunk_end} {p_step} "
-                        f"{idling_start} {idling_end} {idling_step} {noise_model}\n"
-                    )
+            for rounds in rounds_list:
+                if not type(rounds) == int:
+                    rounds *= d
+                for chunk_start, chunk_end in chunks:
+                    for noise_model in noise_models:
+                        lines.append(
+                            f"{decoders} {d} {rounds} {runs_p(chunk_start, idling_start)} {runs_idling(chunk_start, idling_start)} {base_dir}/{category} {chunk_start} {chunk_end} {p_step} "
+                            f"{idling_start} {idling_end} {idling_step} {noise_model}\n"
+                        )
 elif mode == "p_step":
     for d in distances:
+        for rounds in rounds_list:
+            if not type(rounds) == int:
+                rounds *= d
         for noise_model in noise_models:
             lines.append(
-                f"{decoders} {d} {runs_p(p, idling_start)} {runs_idling(p, idling_start)} {base_dir}/{category} {p_start} {p_end} {p_step} "
+                f"{decoders} {d} {rounds} {runs_p(p_start, idling_start)} {runs_idling(p_start, idling_start)} {base_dir}/{category} {p_start} {p_end} {p_step} "
                 f"{idling_start} {idling_end} {idling_step} {noise_model}\n"
             )
 else:
