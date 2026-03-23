@@ -3,12 +3,65 @@
 //
 
 #include <algorithm>
+#include <cmath>
+#include <iostream>
+#include <map>
 
 #include "UnionFindDecoder.h"
 #include "PeelingDecoder.h"
 #include "Logger.h"
+#include "ParsingUtils.h"
 
 using namespace std;
+
+static std::map<DecodingGraphEdge::Type, float> parse_growth_policy(const string& growth_policy_arg)
+{
+    std::map<DecodingGraphEdge::Type, float> type_weights;
+    if (growth_policy_arg.empty() || growth_policy_arg == "uniform" || growth_policy_arg == "default") {
+        type_weights[DecodingGraphEdge::NORMAL] = 0.5f;
+        type_weights[DecodingGraphEdge::MEASUREMENT] = 0.5f;
+        return type_weights;
+    } else if (growth_policy_arg == "third") {
+        type_weights[DecodingGraphEdge::NORMAL] = 1.0f/3.0f;
+        type_weights[DecodingGraphEdge::MEASUREMENT] = 1.0f/3.0f;
+        return type_weights;
+    }
+
+    float normal_weight = NAN;
+    float measurement_weight = NAN;
+
+    vector<pair<string, string>> key_values;
+    try {
+        key_values = ParsingUtils::parse_key_value_list(growth_policy_arg);
+    } catch (const std::invalid_argument& e) {
+        cerr << "Invalid growth_policy: " << e.what() << endl;
+        exit(1);
+    }
+
+    for (auto& [key, val] : key_values) {
+        for (auto& c : key) c = static_cast<char>(toupper(static_cast<unsigned char>(c)));
+
+        try {
+            if (key == "NORMAL") {
+                normal_weight = stof(val);
+            } else if (key == "MEASUREMENT") {
+                measurement_weight = stof(val);
+            } else {
+                cerr << "Unknown edge type in growth_policy: " << key << endl;
+                exit(1);
+            }
+        } catch (const std::exception& e) {
+            cerr << "Invalid numeric value in growth_policy for " << key << ": " << val << endl;
+            exit(1);
+        }
+    }
+
+    if (std::isnan(normal_weight)) normal_weight = 0.5f;
+    if (std::isnan(measurement_weight)) measurement_weight = 0.5f;
+    type_weights[DecodingGraphEdge::NORMAL] = normal_weight;
+    type_weights[DecodingGraphEdge::MEASUREMENT] = measurement_weight;
+    return type_weights;
+}
 
 UnionFindDecoder::UnionFindDecoder(const std::unordered_map<std::string, std::string>& args)
     : Decoder(args)
@@ -22,19 +75,20 @@ UnionFindDecoder::UnionFindDecoder(const std::unordered_map<std::string, std::st
 
     if (const auto it = args.find("growth_policy"); it != args.end()) {
         string policy = it->second;
-        if (policy == "third") {
-            this->set_growth_policy([] (const DecodingGraphNode::Id start, const DecodingGraphNode::Id end) {
-                if (start.round == end.round) return 0.34;
-                if (start.round > end.round) return 1.0;
-                return 0.5;
-            });
-            this->decoder_name_ += "_third_growth";
-        } else if (policy == "faster_backwards") {
-            this->set_growth_policy([] (const DecodingGraphNode::Id start, const DecodingGraphNode::Id end) {
+        if (policy == "faster_backwards") {
+            this->set_growth_policy([] (const DecodingGraphNode::Id start, const DecodingGraphNode::Id end, DecodingGraphEdge::Type edge_type) {
                 if (start.round > end.round) return 1.0;
                 return 0.5;
             });
             this->decoder_name_ += "_faster_backwards_growth";
+        } else {
+            auto type_weights = parse_growth_policy(policy);
+            this->set_growth_policy([type_weights] (const DecodingGraphNode::Id start,
+                                                    const DecodingGraphNode::Id end,
+                                                    DecodingGraphEdge::Type edge_type) {
+                return type_weights.at(edge_type);
+            });
+            this->decoder_name_ += "_custom_growth_" + policy;
         }
     }
 }
@@ -121,7 +175,7 @@ vector<DecodingGraphEdge::FusionEdge> UnionFindDecoder::grow(const shared_ptr<Cl
         auto leaf_node = boundary_edge.leaf_node;
 
         auto edge = boundary_edge.edge;
-        float growth = growth_policy_(tree_node->id(), leaf_node->id());
+        float growth = growth_policy_(tree_node->id(), leaf_node->id(), edge->type());
         edge->add_growth(growth);
         boundary_edge.growth_from_tree += growth;
         boundary_edges.push_back(boundary_edge);

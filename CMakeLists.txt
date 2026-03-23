@@ -16,6 +16,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 add_library(clayg_lib
         src/DecodingGraph.cpp
         src/Cluster.cpp
+        src/ParsingUtils.cpp
         src/UnionFindDecoder.cpp
         src/PeelingDecoder.cpp
         src/ClAYGDecoder.cpp

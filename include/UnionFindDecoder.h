@@ -15,8 +15,8 @@ class UnionFindDecoder : public Decoder
 {
 protected:
     std::vector<std::shared_ptr<Cluster>> m_clusters;
-    std::function<float(DecodingGraphNode::Id, DecodingGraphNode::Id)> growth_policy_ =
-        [](DecodingGraphNode::Id start, DecodingGraphNode::Id end)
+    std::function<float(DecodingGraphNode::Id, DecodingGraphNode::Id, DecodingGraphEdge::Type)> growth_policy_ =
+        [](DecodingGraphNode::Id start, DecodingGraphNode::Id end, DecodingGraphEdge::Type edge_type)
         {
             return 0.5;
         };
@@ -32,7 +32,7 @@ public:
 
     virtual void merge(const std::vector<DecodingGraphEdge::FusionEdge>& fusion_edges);
 
-    void set_growth_policy(const std::function<float(DecodingGraphNode::Id, DecodingGraphNode::Id)> policy) { growth_policy_ = policy; }
+    void set_growth_policy(const std::function<float(DecodingGraphNode::Id, DecodingGraphNode::Id, DecodingGraphEdge::Type)> policy) { growth_policy_ = policy; }
 
     void set_stop_early(const bool stop_early) { stop_early_ = stop_early; }
 };

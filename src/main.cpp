@@ -13,6 +13,7 @@
 #include "ClAYGDecoder.h"
 #include "Logger.h"
 #include "LogicalComputer.h"
+#include "ParsingUtils.h"
 
 using namespace std;
 
@@ -26,6 +27,17 @@ struct DecoderConfig {
     string name;
     unordered_map<string, string> args;
 };
+
+static bool is_likely_decoder_arg_key(const string& key)
+{
+    if (key.empty()) return false;
+    if (!(islower(static_cast<unsigned char>(key[0])) || key[0] == '_')) return false;
+    for (char c : key) {
+        if (!(islower(static_cast<unsigned char>(c)) || isdigit(static_cast<unsigned char>(c)) || c == '_'))
+            return false;
+    }
+    return true;
+}
 
 vector<DecoderConfig> parse_decoder_list(const string& input) {
     vector<DecoderConfig> decoders;
@@ -43,14 +55,22 @@ vector<DecoderConfig> parse_decoder_list(const string& input) {
                 throw invalid_argument("Missing ')' in decoder list for: " + cfg.name);
 
             string inside = input.substr(paren + 1, close - paren - 1);
-            stringstream ss(inside);
-            string kv;
-            while (getline(ss, kv, ',')) {
-                if (kv.empty()) continue;
-                size_t eq = kv.find('=');
-                if (eq == string::npos)
-                    throw invalid_argument("Invalid decoder arg in " + cfg.name + ": " + kv);
-                cfg.args[kv.substr(0, eq)] = kv.substr(eq + 1);
+            vector<pair<string, string>> key_values;
+            try {
+                key_values = ParsingUtils::parse_key_value_list(inside);
+            } catch (const invalid_argument& e) {
+                throw invalid_argument("Invalid decoder arg in " + cfg.name + ": " + e.what());
+            }
+
+            string previous_key;
+            for (const auto& [key, value] : key_values) {
+                // FIXME: This is stupid.
+                if (!is_likely_decoder_arg_key(key) && !previous_key.empty()) {
+                    cfg.args[previous_key] += "," + key + "=" + value;
+                    continue;
+                }
+                cfg.args[key] = value;
+                previous_key = key;
             }
             pos = close + 1;
         } else {
@@ -162,29 +182,19 @@ static std::map<DecodingGraphEdge::Type, double> parse_noise_model(const string&
         return type_factors;
     }
 
-    stringstream ss(noise_model_arg);
-    string kv;
-    auto trim = [](string& str) {
-        size_t a = str.find_first_not_of(" \t\n\r");
-        size_t b = str.find_last_not_of(" \t\n\r");
-        if (a == string::npos) { str = ""; return; }
-        str = str.substr(a, b - a + 1);
-    };
-
     // defaults
     double normal_val = NAN;
     double measurement_val = NAN;
 
-    while (getline(ss, kv, ',')) {
-        if (kv.empty()) continue;
-        auto eq = kv.find('=');
-        if (eq == string::npos) {
-            cerr << "Invalid noise_model token (expected KEY=VALUE): " << kv << endl;
-            exit(1);
-        }
-        string key = kv.substr(0, eq);
-        string val = kv.substr(eq + 1);
-        trim(key); trim(val);
+    vector<pair<string, string>> key_values;
+    try {
+        key_values = ParsingUtils::parse_key_value_list(noise_model_arg);
+    } catch (const std::invalid_argument& e) {
+        cerr << "Invalid noise_model: " << e.what() << endl;
+        exit(1);
+    }
+
+    for (auto& [key, val] : key_values) {
         for (auto & c: key) c = static_cast<char>(toupper(static_cast<unsigned char>(c)));
         try {
             if (key == "NORMAL") {
