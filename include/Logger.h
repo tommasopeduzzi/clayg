@@ -25,8 +25,8 @@ public:
     void log_decoding_step(const std::vector<std::shared_ptr<Cluster>>& clusters, const std::string& decoder, int step, int current_round = -1) const;
     void log_graph(const std::shared_ptr<DecodingGraph>& graph) const;
     void log_errors(const std::vector<DecodingGraphEdge::Id>& error_ids) const;
-    void log_corrections(const std::vector<DecodingGraphEdge::Id>& correction_ids, const std::string& decoder) const;
-    void log_results_entry(double logical_error_rate, int runs, double p, double idling_time_constant, const std::string& decoder_name);
+    void log_corrections(const std::vector<DecodingGraphEdge::Id>& correction_ids, const std::vector<int>& correction_steps, const std::string& decoder) const;
+    void log_results_entry(double logical_error_rate, int runs, double sum_sq, double p, double idling_time_constant, const std::string& decoder_name);
     void log_idling_entry(double p_idling, int runs, double p, double idling_time_constant, const std::string& decoder_name);
     void log_growth_steps(double p, const std::map<double, int>& frequencies, const std::string& decoder_name);
     void prepare_dump_dir() const;

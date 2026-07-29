@@ -157,9 +157,16 @@ DecodingResult UnionFindDecoder::decode(const shared_ptr<DecodingGraph> graph)
     auto peeling_decoder_results = PeelingDecoder::decode(m_clusters, graph);
     // Estimate that peeling decoder takes same amount of growth steps as union find
     growth_steps += peeling_decoder_results.decoding_steps;
+    // All corrections arrive at the final step, where the clusters have been peeled away.
+    int correction_step = log_steps;
     // Log after peeling (no more clusters)
     logger.log_decoding_step({}, decoder_name_, log_steps++, consider_up_to_round_);
-    return {peeling_decoder_results.corrections, consider_up_to_round_, growth_steps};
+    DecodingResult result;
+    result.corrections = peeling_decoder_results.corrections;
+    result.considered_up_to_round = consider_up_to_round_;
+    result.decoding_steps = growth_steps;
+    result.correction_steps.assign(result.corrections.size(), correction_step);
+    return result;
 }
 
 vector<DecodingGraphEdge::FusionEdge> UnionFindDecoder::grow(const shared_ptr<Cluster>& cluster)

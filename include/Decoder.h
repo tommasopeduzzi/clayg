@@ -16,6 +16,9 @@ struct DecodingResult {
     std::vector<std::shared_ptr<DecodingGraphEdge>> corrections;
     int considered_up_to_round;
     double decoding_steps = 0;
+    // Decoding step at which each correction in `corrections` arrived (parallel to
+    // `corrections`). Empty if the decoder does not track arrival steps.
+    std::vector<int> correction_steps;
 };
 
 class Decoder {

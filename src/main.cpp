@@ -412,6 +412,7 @@ int main(int argc, char* argv[])
     {
         struct stats {
             double rolling_sum = 0.0;
+            double sum_sq = 0.0;
             int count = 0;
         };
         // decoder name -> idling time constant -> total logical errors
@@ -422,12 +423,12 @@ int main(int argc, char* argv[])
         for (const auto& decoder : decoders) {
             errors[decoder->decoder_name()] = {};
             // always compute for idling time constant 0.0 for last three corrected runs condition
-            errors[decoder->decoder_name()][0.0] = {0, 0};
+            errors[decoder->decoder_name()][0.0] = {};
             auto idling_time_constant = idling_time_constant_start;
             while (!increment_end_condition(idling_time_constant, idling_time_constant_start, idling_time_constant_end))
             {
-                errors[decoder->decoder_name()][idling_time_constant] = {0, 0};
-                idling[decoder->decoder_name()][idling_time_constant] = {0.0, 0};
+                errors[decoder->decoder_name()][idling_time_constant] = {};
+                idling[decoder->decoder_name()][idling_time_constant] = {};
                 increment_by_step(idling_time_constant, idling_time_constant_step);
             }
             growth_steps[decoder->decoder_name()] = {};
@@ -449,6 +450,7 @@ int main(int argc, char* argv[])
                 error_edges.push_back(edge);
             }
             bool uncorrected = false;
+            std::map<string, bool> corrected_per_decoder {};
             for (const auto& decoder : decoders) {
                 graph->reset();
                 graph->mark(error_edges);
@@ -457,14 +459,16 @@ int main(int argc, char* argv[])
                 for (auto& edge : decoding_results.corrections) {
                     correction_ids.push_back(edge->id());
                 }
-                logger.log_corrections(correction_ids, decoder->decoder_name());
+                logger.log_corrections(correction_ids, decoding_results.correction_steps, decoder->decoder_name());
 
                 logical_computer.clear_cache();
                 int logical_without_idling = logical_computer.compute(error_edges, {}, decoding_results);
                 if (logical_without_idling != 0) {
                     uncorrected = true;
                 }
+                corrected_per_decoder[decoder->decoder_name()] = (logical_without_idling == 0);
                 errors[decoder->decoder_name()][0.0].rolling_sum += logical_without_idling;
+                errors[decoder->decoder_name()][0.0].sum_sq += logical_without_idling * logical_without_idling;
                 errors[decoder->decoder_name()][0.0].count += 1;
 
                 double num_growth_steps = decoding_results.decoding_steps;
@@ -481,6 +485,7 @@ int main(int argc, char* argv[])
                     double p_idling = 0.5 * (1-exp(-(num_growth_steps/idling_time_constant)));
                     idling[decoder->decoder_name()][idling_time_constant].rolling_sum += p_idling;
                     idling[decoder->decoder_name()][idling_time_constant].count += 1;
+                    double history_idling_failures = 0.0;
                     for (int run_idling = 0; run_idling < runs_idling; run_idling++)
                     {
                         auto idling_error_edge_ids = graph->sample_errors(p_idling, noise_model, 1, dis, gen);
@@ -492,9 +497,11 @@ int main(int argc, char* argv[])
                         }
                         int logical_after_idling = logical_computer.compute(error_edges, idling_error_edges,
                             decoding_results);
-                        errors[decoder->decoder_name()][idling_time_constant].rolling_sum += logical_after_idling;
-                        errors[decoder->decoder_name()][idling_time_constant].count += 1;
+                        history_idling_failures += logical_after_idling;
                     }
+                    errors[decoder->decoder_name()][idling_time_constant].rolling_sum += history_idling_failures;
+                    errors[decoder->decoder_name()][idling_time_constant].sum_sq += history_idling_failures * history_idling_failures;
+                    errors[decoder->decoder_name()][idling_time_constant].count += runs_idling;
                     increment_by_step(idling_time_constant, idling_time_constant_step);
                 }
             }
@@ -510,7 +517,7 @@ int main(int argc, char* argv[])
         for (const auto& decoder : decoders) {
             for (const auto& [idling_time_constant, stats] : errors[decoder->decoder_name()]) {
                 double logical_error_rate = static_cast<double>(stats.rolling_sum) / stats.count;
-                logger.log_results_entry(logical_error_rate, stats.count, p,  idling_time_constant, decoder->decoder_name());
+                logger.log_results_entry(logical_error_rate, stats.count, stats.sum_sq, p,  idling_time_constant, decoder->decoder_name());
                 if (idling_time_constant == 0.0)
                     results.back().second[decoder->decoder_name()] = logical_error_rate;
             }

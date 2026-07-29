@@ -135,11 +135,15 @@ void Logger::log_errors(const std::vector<DecodingGraphEdge::Id>& error_ids) con
     write_to_file(filename, content.str(), false);
 }
 
-void Logger::log_corrections(const std::vector<DecodingGraphEdge::Id>& correction_ids, const std::string& decoder) const {
+void Logger::log_corrections(const std::vector<DecodingGraphEdge::Id>& correction_ids, const std::vector<int>& correction_steps, const std::string& decoder) const {
     if (!dump_enabled) return;
     std::ostringstream content;
-    for (const auto& id : correction_ids) {
-        content << id.type << "-" << id.round << "-" << id.id << "\n";
+    for (size_t i = 0; i < correction_ids.size(); i++) {
+        const auto& id = correction_ids[i];
+        content << id.type << "-" << id.round << "-" << id.id;
+        // Log the decoding step at which this correction arrived, when available.
+        int step = i < correction_steps.size() ? correction_steps[i] : -1;
+        content << ", " << step << "\n";
     }
     std::string dir = dump_dir_ + "/" + run_id + "/" + decoder;
     std::filesystem::create_directories(dir);
@@ -170,7 +174,7 @@ int Logger::get_rounds() const {
     return rounds_;
 }
 
-void Logger::log_results_entry(double logical_error_rate, int runs, double p,  double idling_time_constant, const std::string& decoder_name) {
+void Logger::log_results_entry(double logical_error_rate, int runs, double sum_sq, double p,  double idling_time_constant, const std::string& decoder_name) {
     std::string filename = results_dir_ + "/results/"+ decoder_name + "_";
     if (distance_ > 0) {
         filename += "d=" + std::to_string(distance_) + "_";
@@ -187,7 +191,7 @@ void Logger::log_results_entry(double logical_error_rate, int runs, double p,  d
     }
     filename += ".txt";
     std::ostringstream line;
-    line << p << "\t" << logical_error_rate << "\t" << runs << "\n";
+    line << p << "\t" << logical_error_rate << "\t" << runs << "\t" << sum_sq << "\n";
     write_to_file(filename, line.str(), true);
 }
 
