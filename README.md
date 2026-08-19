@@ -1,4 +1,5 @@
 # clayg
+[![DOI](https://zenodo.org/badge/753687432.svg)](https://doi.org/10.5281/zenodo.22008965)
 
 Simulation and decoding code for the paper **"Reducing the Decoding Latency by During-Measurement Clustering"**.
 
@@ -12,7 +13,6 @@ The project implements ClAYG (a during-measurement clustering decoder) alongside
   - `param_generator.py`, `submit_clayg_array_job.sh` — generate parameter sweeps and submit them as SLURM array jobs.
   - `decoding_graph_renderer.py`, `diagram_data_generator.cpp`, `surface_code_check.cpp` — visualization and sanity-check helpers.
 - **`data/`** — Simulation output (results, logs, generated data), organized by experiment.
-- **`paper/`** — LaTeX source, figures, and supporting material for the paper and related presentations.
 
 ## Building
 
