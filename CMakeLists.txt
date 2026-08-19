@@ -38,3 +38,8 @@ target_link_libraries(clayg PRIVATE clayg_lib)
 add_executable(diagram_data_generator tools/diagram_data_generator.cpp
         tools/diagram_data_generator.cpp)
 target_link_libraries(diagram_data_generator PRIVATE clayg_lib)
+
+# -- Diagram Data Generator --
+add_executable(surface_code_check tools/surface_code_check.cpp
+        tools/surface_code_check.cpp)
+target_link_libraries(surface_code_check PRIVATE clayg_lib)

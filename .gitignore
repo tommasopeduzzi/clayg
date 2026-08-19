@@ -1,12 +1,10 @@
-/venv/
+/.venv/
 /cmake-build-debug/
+/cmake-build-debug-coverage/
 /.idea
-/data*
+/data/ccluster
 /runs*
-/tools/plots
 /build
 .envrc
-
 paper/
-
 .vscode/

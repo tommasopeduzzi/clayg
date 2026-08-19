@@ -1,13 +1,13 @@
+//
+// Created by tommasopeduzzi on 2/12/26.
+//
+
 #include "LogicalComputer.h"
 
 #include <algorithm>
 
 #include "UnionFindDecoder.h"
 #include "Decoder.h"
-
-// ------------------------------------------------------------
-// Constructor
-// ------------------------------------------------------------
 
 LogicalComputer::LogicalComputer(const std::shared_ptr<DecodingGraph>& graph)
 {

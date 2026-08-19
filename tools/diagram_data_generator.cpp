@@ -5,6 +5,9 @@
 #include <iostream>
 #include <ostream>
 #include <variant>
+#include <fstream>
+#include <regex>
+#include <sstream>
 
 #include "ClAYGDecoder.h"
 #include "DecodingGraph.h"
@@ -14,7 +17,7 @@ using namespace std;
 
 int main()
 {
-    int D = 6;
+    int D = 7;
     vector<pair<string, unordered_map<string, string>>> decoder_constructors = {
         {"clayg", {}},
         {"clayg", {{"cluster_lifetime", "2"}}},
@@ -42,10 +45,10 @@ int main()
 
     shared_ptr<DecodingGraph> decoding_graph = DecodingGraph::repetition_code(D, D);
 
-    logger.set_dump_dir("data/diagrams/explanations");
+    logger.set_dump_dir("data/explanations");
     logger.set_dump_enabled(true);
 
-    variant<string, int> run_id = "d=6";
+    variant<string, int> run_id = "staircase";
     auto next_run_id = [](variant<string, int> current_run_id) {
         if (holds_alternative<string>(current_run_id))
             return false;
@@ -61,11 +64,54 @@ int main()
     };
 
     double error_rate = 0.04;
-    vector<DecodingGraphEdge::Id> fixed_error_ids = {
-        {DecodingGraphEdge::Type::NORMAL, 1,1},
-        {DecodingGraphEdge::Type::MEASUREMENT, 2,1},
-        {DecodingGraphEdge::Type::NORMAL, 4,4},
+    bool use_fixed_error_ids = true;
+    auto parse_error_id_line = [](const std::string& line) -> std::optional<DecodingGraphEdge::Id> {
+        std::string s = line;
+        // trim
+        s.erase(0, s.find_first_not_of(" \t\r\n"));
+        s.erase(s.find_last_not_of(" \t\r\n") + 1);
+        if (s.empty()) return std::nullopt;
+        if (s[0] == '#') return std::nullopt; // comment
+
+        std::smatch match;
+        std::regex re_name(R"(([A-Za-z]+)-(\d+)-(\d+))");
+        if (std::regex_search(s, match, re_name)) {
+            std::string type_str = match[1].str();
+            for (auto &c : type_str) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+            DecodingGraphEdge::Id id{};
+            if (type_str == "NORMAL") id.type = DecodingGraphEdge::NORMAL;
+            else if (type_str == "MEASUREMENT") id.type = DecodingGraphEdge::MEASUREMENT;
+            else return std::nullopt;
+            id.round = std::stoi(match[2].str());
+            id.id = std::stoi(match[3].str());
+            return id;
+        }
+
+        return std::nullopt;
     };
+
+    vector<DecodingGraphEdge::Id> fixed_error_ids;
+    const std::string fixed_errors_path = "tools/fixed_errors.txt";
+    if (use_fixed_error_ids)
+    {
+        std::ifstream ifs(fixed_errors_path);
+        if (ifs)
+        {
+            std::string line;
+            while (std::getline(ifs, line))
+            {
+                auto maybe_id = parse_error_id_line(line);
+                if (maybe_id.has_value())
+                    fixed_error_ids.push_back(maybe_id.value());
+            }
+        }
+        else
+        {
+            // If file not found we proceed with empty list (fall back to random sampling below)
+            std::cerr << "Warning: could not open " << fixed_errors_path << "; proceeding without fixed errors\n";
+        }
+    }
+
 
     do {
         logger.set_run_id(run_id_to_string(run_id));
@@ -95,13 +141,13 @@ int main()
                 error_edges.push_back(decoding_graph->edge(error_id).value());
             decoding_graph->mark(error_edges);
 
-            auto [corrections, considered_up_to_round, decoding_steps] = decoder->decode(decoding_graph);
+            auto decoding_result = decoder->decode(decoding_graph);
             vector<DecodingGraphEdge::Id> correction_ids;
-            for (const auto& edge : corrections)
+            for (const auto& edge : decoding_result.corrections)
                 correction_ids.push_back(edge->id());
 
             logger.log_errors(error_ids);
-            logger.log_corrections(correction_ids, decoder->decoder_name());
+            logger.log_corrections(correction_ids, decoding_result.correction_steps, decoder->decoder_name());
         }
     } while (next_run_id(run_id));
 }
